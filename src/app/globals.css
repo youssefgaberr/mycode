@@ -1,0 +1,225 @@
+@import "tailwindcss";
+
+/* Dark mode follows a `.dark` class on <html> (set before paint by the theme script). */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/*
+ * Brightpan colour system — "warm kitchen" grade.
+ * Cream + espresso neutrals, terracotta brand, sage for reassurance, honey for
+ * highlights. Text pairs meet WCAG AA (4.5:1) in both themes.
+ */
+:root {
+  --bg: #fbf7f1;
+  --surface: #ffffff;
+  --surface-2: #f4ede3;
+  --surface-3: #eadfcf;
+  --fg: #221c18;
+  --muted: #675c53;
+  --border: #e6dccd;
+  --brand: #b8471f;
+  --brand-hover: #963816;
+  --brand-fg: #ffffff;
+  --brand-soft: #fbe7dc;
+  --sage: #4a6b53;
+  --sage-soft: #e3ede4;
+  --honey: #f2b544;
+  --honey-soft: #fdf1d4;
+  --accent: #fff3d6;
+  --accent-fg: #6b4b0e;
+  --success: #2f7a45;
+  --danger: #b42318;
+  --focus: #2563eb;
+  --shadow: 34 28 24;
+  /* Photo grade: warm tint used over product imagery */
+  --grade-tint: rgb(255 196 140 / 0.18);
+  --grade-filter: saturate(1.08) contrast(1.04) sepia(0.05);
+  color-scheme: light;
+}
+
+.dark {
+  --bg: #141110;
+  --surface: #1c1815;
+  --surface-2: #25201c;
+  --surface-3: #302924;
+  --fg: #f4eee7;
+  --muted: #b9ada2;
+  --border: #3a322c;
+  --brand: #f08a5d;
+  --brand-hover: #f6a880;
+  --brand-fg: #1c1410;
+  --brand-soft: #3a2218;
+  --sage: #8db596;
+  --sage-soft: #1f2b22;
+  --honey: #f2c46b;
+  --honey-soft: #33290f;
+  --accent: #3a2d12;
+  --accent-fg: #f6dc9c;
+  --success: #6fcf8a;
+  --danger: #ff8a7a;
+  --focus: #93c5fd;
+  --shadow: 0 0 0;
+  --grade-tint: rgb(255 170 110 / 0.1);
+  --grade-filter: saturate(1.04) contrast(1.05) brightness(0.93) sepia(0.04);
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-fg: var(--brand-fg);
+  --color-brand-soft: var(--brand-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-honey: var(--honey);
+  --color-honey-soft: var(--honey-soft);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --font-display: var(--font-display), ui-serif, Georgia, "Times New Roman", serif;
+  --shadow-soft: 0 1px 2px rgb(var(--shadow) / 0.06), 0 8px 24px -12px rgb(var(--shadow) / 0.18);
+  --shadow-lift: 0 2px 4px rgb(var(--shadow) / 0.06), 0 18px 40px -16px rgb(var(--shadow) / 0.3);
+  --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  --animate-toast: toast-in 0.25s ease-out both;
+
+  @keyframes fade-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
+  }
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--fg);
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
+  letter-spacing: -0.02em;
+}
+
+/*
+ * Product photo colour grading. Supplier photos come from many studios; this
+ * gives them one warm, cohesive look. In light mode `multiply` blends white
+ * studio backgrounds into our cream surface.
+ */
+.graded {
+  isolation: isolate;
+  background: var(--surface-2);
+}
+.graded img {
+  filter: var(--grade-filter);
+  mix-blend-mode: multiply;
+}
+.dark .graded img {
+  mix-blend-mode: normal;
+}
+.graded::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(160deg, var(--grade-tint), transparent 60%);
+  mix-blend-mode: soft-light;
+}
+
+/* Soft paper grain for hero/feature bands */
+.grain {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgb(242 181 68 / 0.18), transparent 40%),
+    radial-gradient(circle at 85% 10%, rgb(184 71 31 / 0.12), transparent 45%),
+    radial-gradient(circle at 70% 90%, rgb(74 107 83 / 0.12), transparent 40%);
+}
+.dark .grain {
+  background-image:
+    radial-gradient(circle at 15% 20%, rgb(242 196 107 / 0.08), transparent 40%),
+    radial-gradient(circle at 85% 10%, rgb(240 138 93 / 0.1), transparent 45%),
+    radial-gradient(circle at 70% 90%, rgb(141 181 150 / 0.08), transparent 40%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.prose-policy h2 {
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+  font-weight: 600;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+.prose-policy p,
+.prose-policy li {
+  line-height: 1.75;
+  color: var(--fg);
+}
+.prose-policy p + p {
+  margin-top: 0.75rem;
+}
+.prose-policy ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+.prose-policy a {
+  color: var(--brand);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.placeholder {
+  background: var(--accent);
+  color: var(--accent-fg);
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  font-weight: 600;
+}

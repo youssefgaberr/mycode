@@ -121,7 +121,7 @@ All secrets live in `.env.local` (never committed). See `.env.example`.
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | recommended | `pk_test_…`. Shows the payment form on your own site. Without it, customers go to Stripe's hosted page. |
 | `NEXT_PUBLIC_SITE_URL` | yes | e.g. `https://brightpan.co.uk`, no trailing slash. |
 | `ADMIN_PASSWORD` | yes | At least 8 characters; use a long random one. |
-| `DATABASE_URL` | yes | `file:./prisma/dev.db` locally; a Postgres URL in production. |
+| `DATABASE_URL` | yes | `file:./prisma/dev.db` locally; a Postgres URL in production (set by Vercel's Neon integration). |
 | `STORE_MODE` | yes | `test` (default) or `live`. |
 | `CRON_SECRET` | yes on Vercel | A random string. Vercel sends it to the cron endpoints automatically. |
 | `RESEND_API_KEY`, `EMAIL_FROM` | optional | Without them, emails are printed to the server log instead of sent. |
@@ -259,33 +259,62 @@ password logs everyone out.
 
 ## Deploying to Vercel
 
-1. **Use Postgres in production.** SQLite files don't persist on Vercel. Create a
-   Postgres database (for example Neon or Supabase, both available from the Vercel
-   Marketplace), then switch to it:
-   ```bash
-   # prisma/schema.prisma → datasource db { provider = "postgresql" }
-   rm -rf prisma/migrations                     # the SQLite migrations don't apply to Postgres
-   DATABASE_URL="postgres://…" npx prisma migrate dev --name init
-   ```
-   Commit the new `prisma/migrations` folder. The app picks the Postgres driver
-   automatically from the `postgres://` URL.
-2. **Import the repo** in Vercel (New Project → your GitHub repo). The defaults are
-   fine: the build command is `npm run build`, which also runs `prisma generate`.
-3. **Add the environment variables** from the table above in Project → Settings →
-   Environment Variables. Set `NEXT_PUBLIC_SITE_URL` to your production URL.
-4. **Apply migrations** to the production database once, and after every schema
-   change: `DATABASE_URL="postgres://…" npm run db:deploy`.
-5. **Load products** into the production database. Run `npm run import` and/or
-   `npm run discover` locally with `DATABASE_URL` pointing at production. Then press
-   Re-sync in `/admin/products` so the live site refreshes its cache.
-6. **Stripe webhook:** add the endpoint `https://YOUR-DOMAIN/api/stripe/webhook` with
-   the events listed under [Payments](#payments-stripe), and put its signing secret
-   in `STRIPE_WEBHOOK_SECRET`.
-7. **Cron jobs** are defined in `vercel.json`: tracking every 6 hours and a daily sync
-   at 04:30 UTC. Set `CRON_SECRET`.
-   - Vercel's Hobby plan restricts cron frequency. If the 6-hourly schedule is rejected, either upgrade to Pro or call `/api/cron/tracking` from an external scheduler with the header `Authorization: Bearer $CRON_SECRET`.
-8. **Email:** create a Resend account, verify your domain, and set `RESEND_API_KEY`
-   and `EMAIL_FROM`.
+Production uses **Postgres**: SQLite files don't persist on Vercel. You don't need
+to change any code. When `DATABASE_URL` is a Postgres URL, the app switches to the
+Postgres schema automatically, and each deploy applies any new database
+migrations before building.
+
+1. **Create the project.** In [Vercel](https://vercel.com/new), import the GitHub
+   repo `youssefgaberr/mycode`. Leave the framework (Next.js) and build settings as
+   they are.
+2. **Add a database.** In the project, open **Storage → Create Database → Neon
+   (Postgres)** and connect it to the project. Neon's free plan is enough to start.
+   This sets `DATABASE_URL`, and `DATABASE_URL_UNPOOLED`, which is used for
+   migrations.
+3. **Add environment variables** under Project → Settings → Environment Variables:
+
+   | Name | Value |
+   | --- | --- |
+   | `STORE_MODE` | `test` |
+   | `NEXT_PUBLIC_SITE_URL` | your site URL, e.g. `https://brightpan.vercel.app` |
+   | `ADMIN_PASSWORD` | a long random password |
+   | `CRON_SECRET` | a long random string |
+   | `STRIPE_SECRET_KEY` | `sk_test_…` |
+   | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | `pk_test_…` |
+   | `STRIPE_WEBHOOK_SECRET` | from step 5 (add it, then redeploy) |
+   | `CJ_API_KEY` | your CJ API key |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | optional, for real emails |
+
+4. **Deploy.** Vercel deploys from `main`, and every merge to `main` redeploys.
+   The first deploy creates the database tables.
+5. **Stripe webhook:** in Stripe → Developers → Webhooks, add the endpoint
+   `https://YOUR-DOMAIN/api/stripe/webhook` with the events listed under
+   [Payments](#payments-stripe). Copy its signing secret into
+   `STRIPE_WEBHOOK_SECRET` and redeploy.
+6. **Load products into the production database.** On your computer, temporarily
+   point `DATABASE_URL` in `.env.local` at the Neon URL (copy it from Vercel →
+   Storage). Then run `npm run import` and/or `npm run discover`, and switch
+   `DATABASE_URL` back. On the live site, press **Re-sync** in `/admin/products`
+   to refresh the cache. In test mode, `npm run seed:demo` against the same URL
+   gives the live site demo products.
+7. **Cron jobs** are defined in `vercel.json`: tracking every 6 hours and a daily
+   sync at 04:30 UTC. Vercel signs them with `CRON_SECRET` automatically.
+   - Vercel's Hobby (free) plan restricts how often crons may run. If the deploy is rejected because of the 6-hourly schedule, either upgrade to Pro (paid) or change it to daily in `vercel.json` and call `/api/cron/tracking` from a free external scheduler with the header `Authorization: Bearer YOUR_CRON_SECRET`.
+8. **Your own domain:** Project → Settings → Domains. Then update
+   `NEXT_PUBLIC_SITE_URL` and the Stripe webhook URL.
+
+### Database changes
+
+Edit `prisma/schema.prisma` only. Then:
+
+```bash
+npx prisma migrate dev --name what-changed   # SQLite migration for local dev
+npm run db:postgres                          # regenerate prisma/postgres/schema.prisma
+DATABASE_URL="postgresql://…any empty Postgres…" npx prisma migrate dev --name what-changed
+```
+
+Commit both migration folders. The next Vercel deploy applies the Postgres one,
+and a unit test fails if the Postgres schema is out of date.
 
 ---
 
@@ -338,7 +367,8 @@ src/lib/stripe.ts          ← Stripe client with test/live safety check
 src/app/(shop)/            ← storefront pages (home, shop, product, basket, checkout, policies)
 src/app/admin/             ← admin pages and server actions
 src/app/api/               ← checkout, Stripe webhook, cron jobs, video proxy
-prisma/schema.prisma       ← database schema
+prisma/schema.prisma       ← database schema (edit this one)
+prisma/postgres/           ← generated Postgres schema + migrations for production
 scripts/                   ← import, discover, sync, demo seed
 tests/                     ← Vitest unit + integration tests
 ```

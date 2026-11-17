@@ -1,8 +1,9 @@
 // Brightpan database schema.
 //
-// Local development uses SQLite. To switch to Postgres (recommended for
-// Vercel), change `provider` below to "postgresql", set DATABASE_URL to your
-// Postgres connection string and follow "Switching to Postgres" in README.md.
+// This is the schema you edit. Local development uses SQLite; production
+// (Vercel) uses Postgres via prisma/postgres/schema.prisma, which is generated
+// from this file by `npm run db:postgres`. prisma.config.ts picks the right one
+// from DATABASE_URL. See "Database changes" in README.md.
 // The schema deliberately avoids SQLite-only or Postgres-only features.
 //
 // All money is stored as integer pence (GBP) unless the field name ends in

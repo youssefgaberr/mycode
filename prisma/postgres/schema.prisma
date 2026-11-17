@@ -1,0 +1,262 @@
+// GENERATED from prisma/schema.prisma by `npm run db:postgres` — do not edit.
+// Brightpan database schema.
+//
+// This is the schema you edit. Local development uses SQLite; production
+// (Vercel) uses Postgres via prisma/postgres/schema.prisma, which is generated
+// from this file by `npm run db:postgres`. prisma.config.ts picks the right one
+// from DATABASE_URL. See "Database changes" in README.md.
+// The schema deliberately avoids SQLite-only or Postgres-only features.
+//
+// All money is stored as integer pence (GBP) unless the field name ends in
+// `Usd` (CJdropshipping prices, US dollars as decimals).
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Product {
+  id              String  @id @default(cuid())
+  slug            String  @unique
+  cjProductId     String  @unique
+  cjSku           String?
+  /// Key of the entry in src/content/products.ts this product was imported for
+  contentKey      String  @unique
+  title           String
+  summary         String
+  /// Our own description: paragraphs separated by blank lines
+  description     String
+  /// Our own feature bullets, one per line
+  bullets         String
+  /// JSON: [{ "label": string, "value": string }] built from CJ structured data
+  specs           String  @default("[]")
+  category        String
+  /// Cheapest active variant (the one used for "from £" pricing)
+  pricePence      Int
+  supplierCostPence Int
+  shippingCostPence Int
+  estProfitPence  Int
+  isAddOn         Boolean @default(false)
+  warehouseCountry String
+  logisticName    String?
+  deliveryMinDays Int?
+  deliveryMaxDays Int?
+  inStock         Boolean @default(true)
+  /// Admin can hide a product without deleting it
+  published       Boolean @default(true)
+  /// Demo products come from `npm run seed:demo` and can never be sold live
+  isDemo          Boolean @default(false)
+  cjName          String? /// CJ's original English name, for admin reference only
+  lastSyncedAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  variants Variant[]
+  images   ProductImage[]
+  videos   ProductVideo[]
+
+  @@index([category])
+}
+
+model Variant {
+  id               String  @id @default(cuid())
+  productId        String
+  product          Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cjVariantId      String  @unique
+  cjSku            String?
+  /// Our label for the option, e.g. "Grey" or "Set of 2"
+  name             String
+  supplierCostUsd  Float
+  shippingCostUsd  Float
+  supplierCostPence Int
+  shippingCostPence Int
+  pricePence       Int
+  estProfitPence   Int
+  warehouseCountry String
+  logisticName     String?
+  deliveryMinDays  Int?
+  deliveryMaxDays  Int?
+  stock            Int     @default(0)
+  imageUrl         String?
+  active           Boolean @default(true)
+  position         Int     @default(0)
+  updatedAt        DateTime @updatedAt
+
+  @@index([productId])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int     @default(0)
+
+  @@index([productId])
+}
+
+model ProductVideo {
+  id        String  @id @default(cuid())
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  cjVideoId String?
+  url       String
+  position  Int     @default(0)
+
+  @@index([productId])
+}
+
+/// Order lifecycle (status):
+///   PENDING_PAYMENT → PAID → SUBMITTING → SENT_TO_CJ → SHIPPED → DELIVERED
+///   Any CJ problem → NEEDS_ATTENTION (never retried automatically)
+///   EXPIRED: checkout abandoned. CANCELLED/REFUNDED: set by you in admin.
+model Order {
+  id                    String   @id @default(cuid())
+  number                String   @unique
+  stripeSessionId       String   @unique
+  stripePaymentIntentId String?
+  status                String   @default("PENDING_PAYMENT")
+  attentionReason       String?
+  /// true when paid with Stripe test keys / sent to CJ as a sandbox order
+  isTest                Boolean  @default(true)
+
+  email          String?
+  customerName   String?
+  phone          String?
+  shipLine1      String?
+  shipLine2      String?
+  shipCity       String?
+  shipCounty     String?
+  shipPostcode   String?
+  shipCountry    String?
+
+  subtotalPence  Int
+  discountPence  Int
+  deliveryPence  Int
+  totalPence     Int
+  vatPence       Int
+  /// Estimated landed cost (supplier + shipping) when the order was placed
+  estCostPence   Int
+  /// What CJ actually charged (USD, from the CJ order response) — sum over shipments
+  cjCostUsd      Float?
+  stripeFeePence Int?
+  stripeFeeIsEstimate Boolean @default(true)
+  /// Total refunded through Stripe (pence, incl. VAT)
+  refundedPence  Int      @default(0)
+
+  confirmationEmailSentAt DateTime?
+  paidAt         DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  items     OrderItem[]
+  shipments CjShipment[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model OrderItem {
+  id               String @id @default(cuid())
+  orderId          String
+  order            Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId        String?
+  variantId        String?
+  cjVariantId      String
+  title            String
+  variantName      String
+  quantity         Int
+  unitPricePence   Int
+  unitCostPence    Int
+  warehouseCountry String
+  logisticName     String?
+
+  @@index([orderId])
+}
+
+/// One CJ order per source warehouse (an order can ship from several).
+model CjShipment {
+  id             String   @id @default(cuid())
+  orderId        String
+  order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// The orderNumber we send to CJ (unique, lets us look orders up again)
+  cjOrderNumber  String   @unique
+  fromCountry    String
+  logisticName   String?
+  isSandbox      Boolean  @default(true)
+  cjOrderId      String?
+  cjStatus       String?
+  costUsd        Float?
+  trackingNumber String?
+  trackingUrl    String?
+  carrier        String?
+  error          String?
+  shippedAt      DateTime?
+  shippedEmailSentAt DateTime?
+  deliveredAt    DateTime?
+  lastCheckedAt  DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([orderId])
+}
+
+/// Small key/value store (e.g. cached CJ access token).
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model SyncLog {
+  id         String    @id @default(cuid())
+  kind       String
+  ok         Boolean   @default(false)
+  summary    String    @default("")
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}
+
+/// Sourcing database: real supplier products found on CJdropshipping (e.g. by
+/// `npm run discover`), with their photos, videos, costs and delivery data.
+/// Nothing here appears in the shop until you publish it from /admin/sourcing
+/// with your own title and description.
+model SourcingCandidate {
+  id               String   @id @default(cuid())
+  cjProductId      String   @unique
+  cjName           String
+  cjSku            String?
+  cjCategory       String?
+  supplierName     String?
+  /// "trending", or "search:<keyword>"
+  source           String
+  matchedKeyword   String?
+  listedNum        Int      @default(0)
+  supplierCostUsd  Float?
+  shippingCostUsd  Float?
+  warehouseCountry String?
+  logisticName     String?
+  deliveryMinDays  Int?
+  deliveryMaxDays  Int?
+  variantCount     Int      @default(0)
+  stock            Int      @default(0)
+  estPricePence    Int?
+  estProfitPence   Int?
+  isAddOn          Boolean?
+  /// JSON array of image URLs
+  images           String   @default("[]")
+  /// JSON array of video URLs
+  videos           String   @default("[]")
+  /// NEW → APPROVED / REJECTED → PUBLISHED
+  status           String   @default("NEW")
+  productId        String?
+  notes            String?
+  discoveredAt     DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([status])
+}

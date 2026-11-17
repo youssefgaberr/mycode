@@ -1,0 +1,210 @@
+"use server";
+
+import { updateTag } from "next/cache";
+import { redirect } from "next/navigation";
+import { z } from "zod";
+import { store } from "@/config/store";
+import { db } from "@/lib/db";
+import { isLive } from "@/lib/env";
+import { checkPassword, endAdminSession, requireAdmin, startAdminSession } from "@/lib/admin-auth";
+import { fetchOffer, fetchVideos, saveProduct, syncCatalog } from "@/lib/cj/catalog";
+import * as cj from "@/lib/cj/client";
+import { checkTracking, retryCjSubmission } from "@/lib/orders";
+import { getStripe } from "@/lib/stripe";
+import { formatGBP } from "@/lib/pricing";
+
+const back = (path: string, msg: string): never => redirect(`${path}?msg=${encodeURIComponent(msg)}`);
+
+// ── auth ────────────────────────────────────────────────────────────────────
+export async function login(formData: FormData) {
+  const password = String(formData.get("password") ?? "");
+  if (!checkPassword(password)) {
+    await new Promise((r) => setTimeout(r, 800)); // slow down guessing
+    redirect("/admin/login?error=1");
+  }
+  await startAdminSession();
+  redirect("/admin");
+}
+
+export async function logout() {
+  await endAdminSession();
+  redirect("/admin/login");
+}
+
+// ── catalogue ───────────────────────────────────────────────────────────────
+export async function resyncFromCj() {
+  await requireAdmin();
+  const log = await db.syncLog.create({ data: { kind: "sync" } });
+  const lines: string[] = [];
+  let msg: string;
+  try {
+    const r = await syncCatalog((s) => lines.push(s));
+    msg = `Re-sync done: ${r.updated} updated, ${r.hidden} hidden (out of stock), ${r.failed} failed.${
+      r.priceChanges.length ? ` ${r.priceChanges.length} price change(s).` : ""
+    }`;
+    await db.syncLog.update({
+      where: { id: log.id },
+      data: { ok: r.failed === 0, summary: `${msg}\n${lines.join("\n")}`, finishedAt: new Date() },
+    });
+  } catch (err) {
+    msg = `Re-sync failed: ${(err as Error).message}`;
+    await db.syncLog.update({ where: { id: log.id }, data: { ok: false, summary: msg, finishedAt: new Date() } });
+  }
+  updateTag("products");
+  back("/admin/products", msg);
+}
+
+export async function setPublished(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const published = formData.get("published") === "true";
+  await db.product.update({ where: { id }, data: { published } });
+  updateTag("products");
+  back("/admin/products", published ? "Product is now visible in the shop." : "Product hidden from the shop.");
+}
+
+// ── orders ──────────────────────────────────────────────────────────────────
+export async function retryOrder(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  let msg: string;
+  try {
+    const result = await retryCjSubmission(id);
+    msg = result === "sent" ? "Order sent to CJ." : "Still failing — see the reason on the order.";
+  } catch (err) {
+    msg = (err as Error).message;
+  }
+  back("/admin", msg);
+}
+
+const MANUAL_STATUSES = ["CANCELLED", "REFUNDED", "SENT_TO_CJ", "SHIPPED", "DELIVERED"];
+
+export async function setOrderStatus(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const status = String(formData.get("status"));
+  if (!MANUAL_STATUSES.includes(status)) back("/admin", "Invalid status.");
+  await db.order.update({ where: { id }, data: { status, ...(status !== "NEEDS_ATTENTION" ? { attentionReason: null } : {}) } });
+  back("/admin", `Order marked ${status.toLowerCase().replace(/_/g, " ")}.`);
+}
+
+/**
+ * Full refund through Stripe. Requires ticking the confirmation box. Remember
+ * to cancel the CJ order in your CJ dashboard if it hasn't shipped yet.
+ */
+export async function refundOrder(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  if (formData.get("confirm") !== "yes") back("/admin", "Tick the confirmation box to refund.");
+  const order = await db.order.findUniqueOrThrow({ where: { id } });
+  if (!order.stripePaymentIntentId) back("/admin", "This order has no Stripe payment to refund.");
+  const remaining = order.totalPence - order.refundedPence;
+  if (remaining <= 0) back("/admin", "This order has already been fully refunded.");
+  let msg: string;
+  try {
+    await getStripe().refunds.create(
+      { payment_intent: order.stripePaymentIntentId!, amount: remaining, reason: "requested_by_customer", metadata: { orderNumber: order.number } },
+      { idempotencyKey: `refund_${order.id}_${remaining}` },
+    );
+    await db.order.update({ where: { id }, data: { status: "REFUNDED", refundedPence: order.totalPence, attentionReason: null } });
+    msg = `Refunded ${formatGBP(remaining)} for ${order.number}. If CJ hasn't shipped it, cancel the CJ order in your CJ dashboard.`;
+  } catch (err) {
+    msg = `Refund failed: ${(err as Error).message}`;
+  }
+  back("/admin", msg);
+}
+
+export async function runTrackingNow() {
+  await requireAdmin();
+  const r = await checkTracking();
+  back("/admin", `Tracking checked: ${r.checked} order(s), ${r.shipped} newly shipped, ${r.emailed} email(s) sent.${r.problems.length ? ` Problems: ${r.problems.join("; ")}` : ""}`);
+}
+
+/**
+ * TEST MODE ONLY: walks a CJ sandbox order through payment → shipped with a
+ * fake tracking number, so you can test the tracking email end to end.
+ */
+export async function simulateSandboxShipment(formData: FormData) {
+  await requireAdmin();
+  if (isLive()) back("/admin", "Sandbox simulation is disabled in live mode.");
+  const id = String(formData.get("id"));
+  const shipments = await db.cjShipment.findMany({ where: { orderId: id, isSandbox: true, cjOrderId: { not: null } } });
+  if (shipments.length === 0) back("/admin", "No sandbox CJ orders on this order.");
+  const notes: string[] = [];
+  for (const s of shipments) {
+    const step = async (name: string, fn: () => Promise<unknown>) => {
+      try {
+        await fn();
+      } catch (err) {
+        notes.push(`${name}: ${(err as Error).message}`);
+      }
+    };
+    await step("pay", () => cj.sandboxSimulatePay(s.cjOrderId!));
+    await step("unshipped", () => cj.sandboxUpdateStatus(s.cjOrderId!, 400));
+    await step("tracking", () => cj.sandboxUpdateTrackNumber(s.cjOrderId!, `SBX${Date.now().toString().slice(-9)}`));
+    await step("shipped", () => cj.sandboxUpdateStatus(s.cjOrderId!, 500));
+  }
+  const r = await checkTracking();
+  back("/admin", `Sandbox shipment simulated; ${r.emailed} shipping email(s) sent.${notes.length ? ` Notes: ${notes.join("; ")}` : ""}`);
+}
+
+// ── sourcing ────────────────────────────────────────────────────────────────
+export async function setCandidateStatus(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const status = String(formData.get("status"));
+  if (!["NEW", "APPROVED", "REJECTED"].includes(status)) back("/admin/sourcing", "Invalid status.");
+  await db.sourcingCandidate.update({ where: { id }, data: { status } });
+  back("/admin/sourcing", `Marked ${status.toLowerCase()}.`);
+}
+
+const publishSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().trim().min(3).max(80),
+  summary: z.string().trim().min(10).max(160),
+  description: z.string().trim().min(40).max(4000),
+  bullets: z.string().trim().min(3).max(1000),
+  category: z.enum(store.categories.map((c) => c.slug) as [string, ...string[]]),
+});
+
+/**
+ * Publishes a sourcing candidate to the shop with YOUR title and description.
+ * Fetches fresh price/stock/shipping from CJ first.
+ */
+export async function publishCandidate(formData: FormData) {
+  await requireAdmin();
+  const parsed = publishSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) {
+    back("/admin/sourcing", `Please complete every field: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
+    return;
+  }
+  const f = parsed.data;
+  const candidate = await db.sourcingCandidate.findUniqueOrThrow({ where: { id: f.id } });
+  let msg: string;
+  try {
+    const { detail, offer } = await fetchOffer(candidate.cjProductId);
+    if (!offer) throw new Error("No in-stock variant ships to the UK any more.");
+    const videos = await fetchVideos(candidate.cjProductId);
+    const product = await saveProduct({
+      content: {
+        key: `cj-${candidate.cjProductId}`,
+        category: f.category as (typeof store.categories)[number]["slug"],
+        searchTerms: [],
+        match: { all: [] },
+        title: f.title,
+        summary: f.summary,
+        description: f.description,
+        bullets: f.bullets.split("\n").map((b) => b.trim()).filter(Boolean),
+      },
+      detail,
+      offer,
+      videos,
+    });
+    await db.sourcingCandidate.update({ where: { id: f.id }, data: { status: "PUBLISHED", productId: product.id } });
+    msg = `Published “${product.title}”${product.isAddOn ? " (as an add-on — profit below threshold)" : ""}.`;
+  } catch (err) {
+    msg = `Publish failed: ${(err as Error).message}`;
+  }
+  updateTag("products");
+  back("/admin/sourcing", msg);
+}

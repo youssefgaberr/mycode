@@ -10,6 +10,10 @@ orders and tracking. No scraping anywhere.
 > charges or ships. Nothing real happens until you set `STORE_MODE=live` (see
 > [Going live](#going-live)).
 
+> **Handbook:** [`docs/`](docs/README.md) covers the business model, daily operations,
+> automation, product sourcing, content and video, compliance and architecture. **New
+> session? Start with [`docs/STATUS.md`](docs/STATUS.md).**
+
 ---
 
 ## Contents

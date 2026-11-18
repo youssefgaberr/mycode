@@ -17,7 +17,13 @@
     "sync": "tsx scripts/sync.ts",
     "seed:demo": "tsx scripts/seed-demo.ts",
     "discover": "tsx scripts/discover.ts",
-    "db:postgres": "node scripts/postgres-schema.mjs"
+    "db:postgres": "node scripts/postgres-schema.mjs",
+    "economics": "tsx scripts/economics.ts",
+    "live:count": "node scripts/live/count.mjs",
+    "live:collect": "node scripts/live/collect.mjs",
+    "live:export": "node scripts/live/export.mjs",
+    "live:publish": "node scripts/live/publish.mjs",
+    "live:log": "node scripts/live/lastlog.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^1.10.0",

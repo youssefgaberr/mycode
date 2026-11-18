@@ -52,7 +52,7 @@ export const productContent: ProductContent[] = [
     key: "air-fryer-liners",
     // CJ: "Air Fryer Silicone Pot Replacement Of Parchment Paper Liners…"
     cjProductId: "1435061247828692992",
-    category: "cooking",
+    category: "kitchen",
     searchTerms: ["silicone air fryer liner", "air fryer silicone pot"],
     match: {
       all: [["air fryer", "airfryer", "air-fryer"], ["silicone"], ["liner", "pot", "basket", "mat", "tray", "pad", "bowl"]],
@@ -74,7 +74,7 @@ export const productContent: ProductContent[] = [
     key: "usb-food-chopper",
     // CJ: "Multifunctional Household Slice Electric Garlic Pounding Chopper"
     cjProductId: "1716721556694511616",
-    category: "prep",
+    category: "kitchen",
     searchTerms: ["electric garlic chopper usb", "mini electric food chopper", "wireless food chopper"],
     match: {
       all: [["chopper", "garlic", "mincer", "food processor", "masher"], ["electric", "usb", "rechargeable", "cordless", "wireless"]],
@@ -96,7 +96,7 @@ export const productContent: ProductContent[] = [
     key: "milk-frother",
     // CJ: "Modern Minimalist Handheld Electric Milk Powder Stirrer"
     cjProductId: "2408020406281627600",
-    category: "drinks",
+    category: "kitchen",
     searchTerms: ["handheld milk frother", "electric milk frother whisk"],
     match: {
       all: [["frother", "foamer", "froth", "milk whisk", "stirrer"]],
@@ -118,7 +118,7 @@ export const productContent: ProductContent[] = [
     key: "fridge-organiser-bins",
     // CJ: "8 Grids Divided Serving Tray … Refrigerator Organizer"
     cjProductId: "1798298899103485952",
-    category: "storage",
+    category: "home",
     searchTerms: ["fridge organizer box divided", "refrigerator storage box"],
     match: {
       all: [["fridge", "refrigerator"], ["organizer", "organiser", "storage box", "bin", "container", "drawer", "basket"]],
@@ -140,7 +140,7 @@ export const productContent: ProductContent[] = [
     key: "oil-spray-bottle",
     // CJ: "2 In 1 Oil Sprayer Bottle BBQ Cooking Oil Dispenser Olive Oil Pourers Sprayer…"
     cjProductId: "1715574082122551296",
-    category: "cooking",
+    category: "kitchen",
     searchTerms: ["2 in 1 oil sprayer bottle", "oil spray dispenser kitchen", "olive oil sprayer"],
     match: {
       all: [["oil"], ["spray", "sprayer", "mister", "dispenser", "bottle"]],
@@ -163,7 +163,7 @@ export const productContent: ProductContent[] = [
     // CJ: "Kitchen Multi-function Bottle Opener Kitchen Auxiliary Scissors"
     // (CJ had no multi-blade herb scissors when this was chosen.)
     cjProductId: "1761573015550169088",
-    category: "prep",
+    category: "kitchen",
     searchTerms: ["kitchen scissors multifunction", "herb scissors"],
     match: {
       all: [["scissor", "shear"]],
@@ -185,7 +185,7 @@ export const productContent: ProductContent[] = [
     key: "silicone-baking-mat",
     // CJ: "Non-Stick Silicone Pyramid Cooking Mat Baking Mat With Grid…"
     cjProductId: "ECAC663E-87ED-4D84-B320-A8E7FD76AE41",
-    category: "baking",
+    category: "kitchen",
     searchTerms: ["silicone baking mat", "silicone pyramid baking mat"],
     match: {
       all: [["silicone"], ["baking", "bake", "pastry", "oven", "cooking"], ["mat", "sheet", "liner", "pad"]],
@@ -207,7 +207,7 @@ export const productContent: ProductContent[] = [
     key: "vegetable-spiralizer",
     // CJ: "Vegetable Grater Potato Spiral Slicer Whirlwind Fruit Vegetable Spiral Machine…"
     cjProductId: "2409131134451623700",
-    category: "prep",
+    category: "kitchen",
     searchTerms: ["vegetable spiralizer", "spiral slicer vegetable"],
     match: {
       all: [["spiral", "spiraliz", "spiralis"]],

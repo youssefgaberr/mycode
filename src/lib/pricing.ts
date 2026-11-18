@@ -1,4 +1,4 @@
-import { store } from "@/config/store";
+import { store, type MarketConfig } from "@/config/store";
 
 /**
  * Pricing rules (pure functions, unit-tested in tests/pricing.test.ts).
@@ -86,4 +86,51 @@ export function formatGBPShort(pence: number): string {
     currency: store.currency,
     maximumFractionDigits: 0,
   }).format(pence / 100);
+}
+
+// ── Multi-market pricing ────────────────────────────────────────────────────
+
+/**
+ * Price one variant for a market from CJ's USD figures. All results are in
+ * the market's currency, minor units (pence/cents).
+ *
+ *  landed cost = supplier cost + shipping + import-duty allowance
+ *  price       = landed × markup, rounded to .99, at least the market minimum
+ *  profit      = price (net of VAT where prices include it) − landed cost
+ *                − payment fee − ad cost per order
+ */
+export function priceForMarket(supplierCostUsd: number, shippingCostUsd: number, m: MarketConfig) {
+  const toMinor = (usd: number) => Math.round(usd * m.fxFromUsd * 100);
+  const supplier = toMinor(supplierCostUsd);
+  const duty = Math.round(supplier * m.importDutyRate);
+  const shipping = toMinor(shippingCostUsd);
+  const raw = (supplier + duty + shipping) * p.markup;
+  const priceMinor = Math.max(Math.floor(raw / 100) * 100 + 99, toPence(m.minimumPrice));
+  const tax = m.pricesIncludeTax ? priceMinor - Math.round(priceMinor / (1 + m.vatRate)) : 0;
+  const fee = Math.round(priceMinor * m.stripeFeePercent) + toPence(m.stripeFeeFixed);
+  const estProfitMinor = priceMinor - tax - supplier - duty - shipping - fee - toPence(m.adCostPerOrder);
+  return {
+    priceMinor,
+    /** supplier cost plus the import-duty allowance */
+    supplierCostMinor: supplier + duty,
+    shippingCostMinor: shipping,
+    estProfitMinor,
+    isAddOn: estProfitMinor < toPence(m.addOnProfitThreshold),
+  };
+}
+
+/** Tax contained in a gross amount for a market (0 where prices exclude tax). */
+export function taxIncludedMinor(grossMinor: number, m: MarketConfig) {
+  return m.pricesIncludeTax ? grossMinor - Math.round(grossMinor / (1 + m.vatRate)) : 0;
+}
+
+export function formatMoney(minor: number, m: Pick<MarketConfig, "currency" | "locale">): string {
+  return new Intl.NumberFormat(m.locale, { style: "currency", currency: m.currency }).format(minor / 100);
+}
+
+export function formatMoneyShort(minor: number, m: Pick<MarketConfig, "currency" | "locale">): string {
+  if (minor % 100 !== 0) return formatMoney(minor, m);
+  return new Intl.NumberFormat(m.locale, { style: "currency", currency: m.currency, maximumFractionDigits: 0 }).format(
+    minor / 100,
+  );
 }

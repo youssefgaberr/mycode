@@ -76,15 +76,89 @@ export const store = {
   minimumWarehouseStock: 5,
 
   categories: [
-    { slug: "cooking", name: "Cooking & air fryer" },
-    { slug: "prep", name: "Food prep" },
-    { slug: "drinks", name: "Coffee & drinks" },
-    { slug: "storage", name: "Storage & organising" },
-    { slug: "baking", name: "Baking" },
+    { slug: "kitchen", name: "Kitchen & dining" },
+    { slug: "home", name: "Home & organisation" },
+    { slug: "fitness", name: "Fitness, outdoor & travel" },
+    { slug: "pets", name: "Pets" },
+    { slug: "car", name: "Car accessories" },
   ],
+
+  /**
+   * Show "add-on only" products in the main catalogue too (they still also
+   * appear in "Complete your order"). Set false to hide low-margin items
+   * from the main grid.
+   */
+  showAddOnsInMainGrid: true,
+
+  /**
+   * Markets we sell to. Customers switch with the £/$ button (or are
+   * detected by location). Each market has its own currency, shipping
+   * quotes from CJ, delivery charges and tax rules. Money in POUNDS/DOLLARS.
+   *
+   * UK: prices include 20% VAT.
+   * US: prices exclude sales tax (shown at checkout as $0 unless you set up
+   *     Stripe Tax). Parcels from China pay US import duty — `importDutyRate`
+   *     adds an allowance for it to the cost basis. Check current tariffs.
+   */
+  markets: {
+    GB: {
+      code: "GB",
+      label: "United Kingdom",
+      flag: "🇬🇧",
+      currency: "GBP",
+      locale: "en-GB",
+      shipTo: ["GB"],
+      /** USD (CJ's currency) → this market's currency */
+      fxFromUsd: 0.79,
+      vatRate: 0.2,
+      pricesIncludeTax: true,
+      importDutyRate: 0,
+      minimumPrice: 12.99,
+      deliveryFee: 3.99,
+      freeDeliveryThreshold: 35,
+      stripeFeePercent: 0.015,
+      stripeFeeFixed: 0.2,
+      adCostPerOrder: 8,
+      addOnProfitThreshold: 3,
+      /** Warehouses to ship from, best first */
+      warehouses: ["GB", "DE", "CN"],
+    },
+    US: {
+      code: "US",
+      label: "United States",
+      flag: "🇺🇸",
+      currency: "USD",
+      locale: "en-US",
+      shipTo: ["US"],
+      fxFromUsd: 1,
+      vatRate: 0,
+      pricesIncludeTax: false,
+      importDutyRate: 0.3,
+      minimumPrice: 14.99,
+      deliveryFee: 4.99,
+      freeDeliveryThreshold: 45,
+      stripeFeePercent: 0.029,
+      stripeFeeFixed: 0.3,
+      adCostPerOrder: 10,
+      addOnProfitThreshold: 4,
+      warehouses: ["US", "CN"],
+    },
+  },
 } as const;
 
 export type CategorySlug = (typeof store.categories)[number]["slug"];
+export type MarketCode = keyof typeof store.markets;
+export const MARKETS = Object.keys(store.markets) as MarketCode[];
+export const DEFAULT_MARKET: MarketCode = "GB";
+export type MarketConfig = (typeof store.markets)[MarketCode];
+
+export function marketConfig(code: string | null | undefined): MarketConfig {
+  return store.markets[(code && code in store.markets ? code : DEFAULT_MARKET) as MarketCode];
+}
+
+export function isMarket(code: unknown): code is MarketCode {
+  return typeof code === "string" && code in store.markets;
+}
 
 export const warehouseLabels: Record<string, string> = {
   GB: "UK warehouse",

@@ -1,5 +1,5 @@
-import { store } from "@/config/store";
-import { toPence, vatIncludedPence } from "@/lib/pricing";
+import { store, type MarketConfig } from "@/config/store";
+import { taxIncludedMinor, toPence } from "@/lib/pricing";
 
 /**
  * Basket maths (pure, unit-tested). Used both to show the basket and to
@@ -34,7 +34,8 @@ export interface BasketTotals {
 
 const b = store.basket;
 
-export function calculateBasket(lines: BasketLineInput[]): BasketTotals {
+/** Basket totals in the market's currency (minor units). Defaults to the UK market. */
+export function calculateBasket(lines: BasketLineInput[], market: MarketConfig = store.markets.GB): BasketTotals {
   const itemCount = lines.reduce((n, l) => n + l.quantity, 0);
   const subtotalPence = lines.reduce((s, l) => s + l.unitPricePence * l.quantity, 0);
 
@@ -42,9 +43,9 @@ export function calculateBasket(lines: BasketLineInput[]): BasketTotals {
   const discountPence = multiBuyApplied ? Math.round((subtotalPence * b.multiBuyPercentOff) / 100) : 0;
   const itemsAfterDiscountPence = subtotalPence - discountPence;
 
-  const threshold = toPence(b.freeDeliveryThreshold);
+  const threshold = toPence(market.freeDeliveryThreshold);
   const freeDelivery = itemCount > 0 && itemsAfterDiscountPence >= threshold;
-  const deliveryPence = itemCount === 0 || freeDelivery ? 0 : toPence(b.deliveryFee);
+  const deliveryPence = itemCount === 0 || freeDelivery ? 0 : toPence(market.deliveryFee);
 
   const totalPence = itemsAfterDiscountPence + deliveryPence;
 
@@ -57,7 +58,7 @@ export function calculateBasket(lines: BasketLineInput[]): BasketTotals {
     deliveryPence,
     freeDelivery,
     totalPence,
-    vatPence: vatIncludedPence(totalPence),
+    vatPence: taxIncludedMinor(totalPence, market),
     itemsToMultiBuy: multiBuyApplied ? 0 : Math.max(0, b.multiBuyMinItems - itemCount),
     spendToFreeDeliveryPence: freeDelivery ? 0 : Math.max(0, threshold - itemsAfterDiscountPence),
   };

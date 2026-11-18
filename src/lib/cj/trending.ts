@@ -10,6 +10,7 @@ import { aiConfigured, writeProductCopy } from "@/lib/ai/copywriter";
 import * as cj from "./client";
 import type { CjListProduct } from "./types";
 import { buildSpecs, fetchOffer, fetchVideos, num, saveProduct } from "./catalog";
+import { saveCandidate } from "./discover";
 
 /** What we search CJ's trending lists for, per category. Edit freely. */
 export const TRENDING_SEARCHES: { keyword: string; category: CategorySlug }[] = [
@@ -175,3 +176,51 @@ export async function importTrendingProducts(opts: { limit?: number; timeBudgetM
   return { ...result, candidates: found.size };
 }
 
+
+/**
+ * Collect-only mode: saves trending products (with photos, videos, prices,
+ * shipping and supplier details) to the sourcing database without writing
+ * copy, so copy can be written separately and bulk-published.
+ */
+export async function collectTrendingCandidates(opts: { limit?: number; timeBudgetMs?: number; log?: (s: string) => void } = {}) {
+  const limit = opts.limit ?? 30;
+  const budget = opts.timeBudgetMs ?? 235_000;
+  const log = opts.log ?? console.log;
+  const started = Date.now();
+  const known = new Set([
+    ...(await db.product.findMany({ select: { cjProductId: true } })).map((r) => r.cjProductId),
+    ...(await db.sourcingCandidate.findMany({ select: { cjProductId: true } })).map((r) => r.cjProductId),
+  ]);
+  const runNo = await db.syncLog.count({ where: { kind: "admin-collect" } });
+  const offset = (runNo * 4) % TRENDING_SEARCHES.length;
+  const searches = [...TRENDING_SEARCHES.slice(offset), ...TRENDING_SEARCHES.slice(0, offset)];
+  const found: { p: CjListProduct; category: CategorySlug; score: number }[] = [];
+  const seen = new Set<string>();
+  for (const { keyword, category } of searches) {
+    if (Date.now() - started > budget * 0.25) break;
+    for (const country of ["GB", undefined] as const) {
+      try {
+        const results = await cj.searchProducts({ keyWord: keyword, countryCode: country, productFlag: 0, size: 20 });
+        for (const p of results) {
+          if (!p.id || known.has(p.id) || seen.has(p.id) || !trendingAllowed(p.nameEn ?? "") || num(p.sellPrice) > MAX_COST_USD) continue;
+          seen.add(p.id);
+          found.push({ p, category, score: (country === "GB" ? 30 : 0) + Math.log10(num(p.listedNum) + 1) * 10 + (num(p.isVideo) ? 5 : 0) });
+        }
+      } catch (err) {
+        log(`  search "${keyword}" failed: ${(err as Error).message}`);
+      }
+    }
+  }
+  // Round-robin by category so every category gets products.
+  const byCat = new Map<string, typeof found>();
+  for (const f of found.sort((a, b) => b.score - a.score)) byCat.set(f.category, [...(byCat.get(f.category) ?? []), f]);
+  const queue: typeof found = [];
+  for (let i = 0; queue.length < found.length && i < 200; i++) for (const l of byCat.values()) if (l[i]) queue.push(l[i]);
+  log(`${found.length} new trending candidates; collecting up to ${limit}…`);
+  let saved = 0;
+  for (const { p, category } of queue) {
+    if (saved >= limit || Date.now() - started > budget) break;
+    if (await saveCandidate(p, "trending", category, log)) saved++;
+  }
+  return { found: found.length, saved };
+}

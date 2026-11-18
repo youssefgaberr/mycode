@@ -10,7 +10,7 @@ import { checkPassword, endAdminSession, requireAdmin, startAdminSession } from 
 import { fetchOffer, fetchVideos, saveProduct, syncCatalog } from "@/lib/cj/catalog";
 import { importProducts, PIN_PREFIX } from "@/lib/cj/import";
 import { discoverProducts, searchToSourcing } from "@/lib/cj/discover";
-import { importTrendingProducts } from "@/lib/cj/trending";
+import { collectTrendingCandidates, importTrendingProducts } from "@/lib/cj/trending";
 import { aiConfigured } from "@/lib/ai/copywriter";
 import { contentByKey } from "@/content/products";
 import { seedDemoProducts } from "@/lib/demo";
@@ -134,6 +134,106 @@ export async function importTrending() {
   );
   updateTag("products");
   back("/admin/products", msg);
+}
+
+/** Collect trending products into the sourcing database (no copy written). */
+export async function collectTrending() {
+  await requireAdmin();
+  if (!cjConfigured()) back("/admin/sourcing", "Add CJ_API_KEY in Vercel first.");
+  const msg = await withRunLog(
+    "collect",
+    (log) => collectTrendingCandidates({ limit: 30, log }),
+    (r) => `Collected ${r.saved} trending products into the sourcing database (${r.found} found). Run again for more.`,
+  );
+  back("/admin/sourcing", msg);
+}
+
+const bulkSchema = z.array(
+  z.union([
+    z.object({ cjProductId: z.string().min(1), reject: z.string().min(1) }),
+    z.object({
+      cjProductId: z.string().min(1),
+      category: z.enum(store.categories.map((c) => c.slug) as [string, ...string[]]),
+      title: z.string().trim().min(3).max(80),
+      summary: z.string().trim().min(10).max(160),
+      description: z.string().trim().min(40).max(4000),
+      bullets: z.array(z.string().trim().min(2)).min(2).max(6),
+    }),
+  ]),
+);
+
+/**
+ * Bulk publish: JSON array of { cjProductId, category, title, summary,
+ * description, bullets } (or { cjProductId, reject }) — our own copy for
+ * products found on CJ. Fetches fresh price, stock and shipping for each and
+ * publishes it marked HOT. Stops before the time limit; re-submit the rest.
+ */
+export async function bulkPublish(formData: FormData) {
+  await requireAdmin();
+  let items: z.infer<typeof bulkSchema>;
+  try {
+    const parsed = bulkSchema.safeParse(JSON.parse(String(formData.get("json") ?? "[]")));
+    if (!parsed.success) throw new Error(parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).slice(0, 3).join("; "));
+    items = parsed.data;
+  } catch (err) {
+    back("/admin/sourcing", `Bulk publish: invalid JSON — ${(err as Error).message}`);
+    return;
+  }
+  const started = Date.now();
+  const msg = await withRunLog(
+    "bulk",
+    async (log) => {
+      const r = { published: 0, rejected: 0, failed: 0, notProcessed: [] as string[] };
+      for (const item of items) {
+        if (Date.now() - started > 235_000) {
+          r.notProcessed.push(item.cjProductId);
+          continue;
+        }
+        if ("reject" in item) {
+          await db.sourcingCandidate.updateMany({ where: { cjProductId: item.cjProductId }, data: { status: "REJECTED", notes: item.reject } });
+          r.rejected++;
+          continue;
+        }
+        try {
+          const { detail, offer, offers } = await fetchOffer(item.cjProductId);
+          if (!offer) throw new Error("no stock that ships to the UK any more");
+          const videos = await fetchVideos(item.cjProductId);
+          const product = await saveProduct({
+            content: {
+              key: `cj-${item.cjProductId}`,
+              category: item.category as (typeof store.categories)[number]["slug"],
+              searchTerms: [],
+              match: { all: [] },
+              title: item.title,
+              summary: item.summary,
+              description: item.description,
+              bullets: item.bullets,
+            },
+            detail,
+            offer,
+            offers,
+            videos,
+          });
+          await db.product.update({ where: { id: product.id }, data: { isTrending: true } });
+          await db.sourcingCandidate.updateMany({
+            where: { cjProductId: item.cjProductId },
+            data: { status: "PUBLISHED", productId: product.id },
+          });
+          r.published++;
+          log(`  ✓ ${product.title}`);
+        } catch (err) {
+          r.failed++;
+          log(`  ✗ ${item.cjProductId}: ${(err as Error).message}`);
+        }
+      }
+      return r;
+    },
+    (r) =>
+      `Bulk publish: ${r.published} published, ${r.rejected} rejected, ${r.failed} failed` +
+      (r.notProcessed.length ? `, ${r.notProcessed.length} not processed (time limit) — submit them again.` : "."),
+  );
+  updateTag("products");
+  back("/admin/sourcing", msg);
 }
 
 /** Search CJ for a keyword and add the best listings to the sourcing database. */

@@ -286,6 +286,8 @@ model SourcingCandidate {
   videos           String   @default("[]")
   /// NEW → APPROVED / REJECTED → PUBLISHED
   status           String   @default("NEW")
+  /// JSON: supplier details used to write copy (materials, options, specs, description excerpt)
+  info             String   @default("{}")
   productId        String?
   notes            String?
   discoveredAt     DateTime @default(now())

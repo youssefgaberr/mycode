@@ -5,9 +5,11 @@
  * time — in the SourcingCandidate table for you to review in /admin/sourcing.
  */
 import { db } from "@/lib/db";
+import { store } from "@/config/store";
+import { priceForMarket } from "@/lib/pricing";
 import * as cj from "./client";
 import type { CjListProduct } from "./types";
-import { collectImages, fetchOffer, fetchVideos, num } from "./catalog";
+import { buildSpecs, collectImages, fetchOffer, fetchVideos, num } from "./catalog";
 
 /** Searches we run against CJ's catalogue. Edit freely. */
 export const DISCOVERY_KEYWORDS = [
@@ -128,7 +130,7 @@ export async function discoverProducts(opts: { limit?: number; log?: (s: string)
 /** Fetches full CJ data for one listing and stores it in the sourcing database. */
 export async function saveCandidate(p: CjListProduct, source: string, keyword: string, log: (s: string) => void = console.log) {
   try {
-    const { detail, offer } = await fetchOffer(p.id, log);
+    const { detail, offer, offers } = await fetchOffer(p.id, log);
     if (!offer) {
       log(`  skip ${p.nameEn}: no in-stock variant that ships to the UK`);
       return false;
@@ -156,6 +158,14 @@ export async function saveCandidate(p: CjListProduct, source: string, keyword: s
       isAddOn: main.priced.isAddOn,
       images: JSON.stringify(collectImages(detail, offer)),
       videos: JSON.stringify(videos.map((v) => v.url)),
+      // Supplier details kept for writing our own copy later (never shown to customers).
+      info: JSON.stringify({
+        materials: detail.materialNameEnSet ?? [],
+        options: offer.variants.map((v) => v.name),
+        specs: buildSpecs(detail, offer),
+        description: stripHtml(detail.description ?? "").slice(0, 1500),
+        usPriceMinor: offers?.US?.variants[0] ? priceForMarket(offers.US.variants[0].supplierCostUsd, offers.US.variants[0].shippingCostUsd, store.markets.US).priceMinor : null,
+      }),
     };
     await db.sourcingCandidate.upsert({
       where: { cjProductId: p.id },
@@ -223,4 +233,14 @@ export async function searchToSourcing(keyword: string, opts: { limit?: number; 
     if (await saveCandidate(p, `search:${keyword}`, keyword, log)) saved++;
   }
   return { found: ranked.length, saved };
+}
+
+function stripHtml(html: string) {
+  return html
+    .replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<img[^>]*>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }

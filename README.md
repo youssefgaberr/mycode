@@ -181,6 +181,18 @@ also skips lighters, vapes, medical products and baby/children's products, which
 extra safety rules. Edit `src/lib/cj/discover.ts` to change the search keywords or
 these filters.
 
+### A2. Trending products in bulk (all categories)
+
+1. In `/admin/sourcing`, click **Collect trending (all categories)**. Each run takes about 4 minutes. It searches CJ's trending lists for every category (kitchen, home, fitness/travel, pets, car) and saves around 15–30 new products, with photos, videos, real cost, UK and US shipping, and the supplier's details. Run it again for more; each run starts with different searches.
+2. Open **export (JSON)** (`/admin/sourcing/export`) to get the supplier details for writing copy.
+3. Open **Bulk publish**, paste a JSON array and click **Publish all**. Each item is either:
+   - `{ "cjProductId", "category", "title", "summary", "description", "bullets": [] }`, which publishes the product with your copy; or
+   - `{ "cjProductId", "reject": "reason" }`, which marks it rejected.
+4. Each product gets a fresh CJ price, stock and shipping check, then is published, priced for the UK and the US, and marked **HOT**.
+5. About 25 products fit in one run. If the time limit is reached, the message tells you how many weren't processed; paste those again.
+
+If `ANTHROPIC_API_KEY` is set, **Import trending with AI** does all three steps automatically: it writes copy with Claude and screens out restricted products.
+
 ### B. In code (`src/content/products.ts`)
 
 Each entry has your copy plus the search terms and match rules used to find the product

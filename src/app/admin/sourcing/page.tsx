@@ -6,7 +6,7 @@ import { formatGBP } from "@/lib/pricing";
 import { store, warehouseLabels } from "@/config/store";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, StatusBadge, btn, btnPrimary } from "@/components/admin/ui";
-import { discoverTrending, publishCandidate, searchCj, setCandidateStatus, useForCoreProduct } from "../actions";
+import { bulkPublish, collectTrending, discoverTrending, publishCandidate, searchCj, setCandidateStatus, useForCoreProduct } from "../actions";
 import { productContent } from "@/content/products";
 
 export const maxDuration = 300;
@@ -53,6 +53,9 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
           text is never shown to customers.
         </p>
         </div>
+        <form action={collectTrending}>
+          <SubmitButton className={btnPrimary} pendingText="Collecting… (about 4 min)">Collect trending (all categories)</SubmitButton>
+        </form>
         <form action={discoverTrending}>
           <SubmitButton className={btnPrimary} pendingText="Searching CJ… (2–4 min)">Discover trending products</SubmitButton>
         </form>
@@ -61,6 +64,25 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
         Discovery searches CJ and saves up to 10 new products per run (takes 2–4 minutes; keep this page open). Run it
         again for more.
       </p>
+
+      <details className="rounded-2xl border border-border bg-surface p-4">
+        <summary className="cursor-pointer text-sm font-semibold">Bulk publish (paste JSON)</summary>
+        <p className="mt-2 text-xs text-muted">
+          A JSON array of{" "}
+          <code>{`{ "cjProductId", "category", "title", "summary", "description", "bullets": [] }`}</code> — or{" "}
+          <code>{`{ "cjProductId", "reject": "reason" }`}</code>. Candidate data for writing copy:{" "}
+          <a className="underline" href="/admin/sourcing/export">
+            export (JSON)
+          </a>
+          .
+        </p>
+        <form action={bulkPublish} className="mt-3 space-y-2">
+          <textarea name="json" rows={6} required className="w-full rounded-lg border border-border bg-bg p-2 font-mono text-xs" />
+          <SubmitButton className={btnPrimary} pendingText="Publishing… (up to 4 min)">
+            Publish all
+          </SubmitButton>
+        </form>
+      </details>
 
       <form action={searchCj} className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-surface p-4">
         <label className="min-w-0 flex-1 text-sm font-semibold">

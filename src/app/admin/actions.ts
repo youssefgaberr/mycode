@@ -10,6 +10,8 @@ import { checkPassword, endAdminSession, requireAdmin, startAdminSession } from 
 import { fetchOffer, fetchVideos, saveProduct, syncCatalog } from "@/lib/cj/catalog";
 import { importProducts, PIN_PREFIX } from "@/lib/cj/import";
 import { discoverProducts, searchToSourcing } from "@/lib/cj/discover";
+import { importTrendingProducts } from "@/lib/cj/trending";
+import { aiConfigured } from "@/lib/ai/copywriter";
 import { contentByKey } from "@/content/products";
 import { seedDemoProducts } from "@/lib/demo";
 import * as cj from "@/lib/cj/client";
@@ -113,6 +115,25 @@ export async function discoverTrending() {
     (r) => `Searched CJ: ${r.eligible} eligible products found, ${r.saved} added to the sourcing database with photos, videos and costs.`,
   );
   back("/admin/sourcing", msg);
+}
+
+/**
+ * Imports a batch of trending products from CJ with AI-written copy and
+ * publishes them (marked HOT). About 10–12 per run; run again for more.
+ */
+export async function importTrending() {
+  await requireAdmin();
+  if (!cjConfigured()) back("/admin/products", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
+  if (!aiConfigured()) back("/admin/products", "Add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables (needed to write product descriptions), redeploy, then try again.");
+  const msg = await withRunLog(
+    "trending",
+    (log) => importTrendingProducts({ limit: 12, log }),
+    (r) =>
+      `Published ${r.published} trending product(s)${r.titles.length ? `: ${r.titles.slice(0, 6).join(", ")}${r.titles.length > 6 ? "…" : ""}` : ""}. ` +
+      `${r.rejected} screened out, ${r.skipped} not shippable, ${r.failed} failed. Run again for more.`,
+  );
+  updateTag("products");
+  back("/admin/products", msg);
 }
 
 /** Search CJ for a keyword and add the best listings to the sourcing database. */

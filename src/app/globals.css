@@ -127,6 +127,17 @@ body {
   text-rendering: optimizeLegibility;
 }
 
+/* Market (currency) switch: only the visitor's market values are shown.
+   Wrappers are layout-neutral (display: contents). */
+.mk-GB,
+.mk-US {
+  display: contents;
+}
+html[data-market="US"] .mk-GB,
+html:not([data-market="US"]) .mk-US {
+  display: none !important;
+}
+
 ::selection {
   background: var(--brand-soft);
   color: var(--fg);

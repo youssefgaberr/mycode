@@ -2,10 +2,24 @@
  * Cached catalogue reads for the storefront. Results are cached (Next.js
  * Cache Components) and refreshed hourly, or immediately when a CJ re-sync
  * calls revalidateTag("products").
+ *
+ * Every product carries its price/delivery for EACH market; the page shows
+ * the visitor's market with CSS (see MarketValue), so pages stay static.
  */
 import { cacheLife, cacheTag } from "next/cache";
+import { MARKETS, store, type MarketCode } from "@/config/store";
 import { db } from "@/lib/db";
 import { isLive } from "@/lib/env";
+
+export interface MarketPrice {
+  priceMinor: number;
+  hasVariantPrices: boolean;
+  deliveryMinDays: number | null;
+  deliveryMaxDays: number | null;
+  warehouseCountry: string;
+  defaultVariantId: string | null;
+}
+export type MarketPrices = Partial<Record<MarketCode, MarketPrice>>;
 
 export interface ProductCardData {
   id: string;
@@ -13,6 +27,7 @@ export interface ProductCardData {
   title: string;
   summary: string;
   category: string;
+  /** UK price (kept for older callers); use `markets` for display */
   pricePence: number;
   hasVariantPrices: boolean;
   image: string | null;
@@ -23,6 +38,16 @@ export interface ProductCardData {
   deliveryMinDays: number | null;
   deliveryMaxDays: number | null;
   defaultVariantId: string | null;
+  /** Price and delivery per market; a missing market means "not available there" */
+  markets: MarketPrices;
+}
+
+export interface VariantMarketData {
+  priceMinor: number;
+  deliveryMinDays: number | null;
+  deliveryMaxDays: number | null;
+  warehouseCountry: string;
+  logisticName: string | null;
 }
 
 export interface ProductPageData extends ProductCardData {
@@ -40,6 +65,7 @@ export interface ProductPageData extends ProductCardData {
     deliveryMinDays: number | null;
     deliveryMaxDays: number | null;
     warehouseCountry: string;
+    markets: Partial<Record<MarketCode, VariantMarketData>>;
   }[];
 }
 
@@ -53,12 +79,19 @@ function visibleWhere() {
   };
 }
 
+const variantInclude = {
+  where: { active: true },
+  orderBy: { pricePence: "asc" as const },
+  include: { markets: { where: { available: true } } },
+};
+
 const cardInclude = {
   images: { orderBy: { position: "asc" as const }, take: 1 },
-  variants: { where: { active: true }, orderBy: { pricePence: "asc" as const } },
+  variants: variantInclude,
 };
 
 type CardRow = Awaited<ReturnType<typeof fetchCards>>[number];
+type VariantRow = CardRow["variants"][number];
 
 function fetchCards(where: object) {
   return db.product.findMany({
@@ -66,6 +99,51 @@ function fetchCards(where: object) {
     include: cardInclude,
     orderBy: [{ createdAt: "asc" }],
   });
+}
+
+/** A variant's data in one market; UK falls back to the variant's own fields. */
+function variantInMarket(v: VariantRow, code: MarketCode): VariantMarketData | null {
+  const row = v.markets.find((m) => m.market === code);
+  if (row) {
+    return {
+      priceMinor: row.priceMinor,
+      deliveryMinDays: row.deliveryMinDays,
+      deliveryMaxDays: row.deliveryMaxDays,
+      warehouseCountry: row.warehouseCountry,
+      logisticName: row.logisticName,
+    };
+  }
+  if (code === "GB" && v.markets.length === 0) {
+    return {
+      priceMinor: v.pricePence,
+      deliveryMinDays: v.deliveryMinDays,
+      deliveryMaxDays: v.deliveryMaxDays,
+      warehouseCountry: v.warehouseCountry,
+      logisticName: v.logisticName,
+    };
+  }
+  return null;
+}
+
+function marketPrices(variants: VariantRow[]): MarketPrices {
+  const out: MarketPrices = {};
+  for (const code of MARKETS) {
+    const avail = variants
+      .map((v) => ({ v, m: variantInMarket(v, code) }))
+      .filter((x): x is { v: VariantRow; m: VariantMarketData } => !!x.m)
+      .sort((a, b) => a.m.priceMinor - b.m.priceMinor);
+    if (avail.length === 0) continue;
+    const first = avail[0];
+    out[code] = {
+      priceMinor: first.m.priceMinor,
+      hasVariantPrices: new Set(avail.map((x) => x.m.priceMinor)).size > 1,
+      deliveryMinDays: first.m.deliveryMinDays,
+      deliveryMaxDays: first.m.deliveryMaxDays,
+      warehouseCountry: first.m.warehouseCountry,
+      defaultVariantId: first.v.id,
+    };
+  }
+  return out;
 }
 
 function toCard(p: CardRow): ProductCardData {
@@ -86,16 +164,21 @@ function toCard(p: CardRow): ProductCardData {
     deliveryMinDays: p.deliveryMinDays,
     deliveryMaxDays: p.deliveryMaxDays,
     defaultVariantId: p.variants[0]?.id ?? null,
+    markets: marketPrices(p.variants),
   };
 }
 
-/** Main catalogue (excludes add-on-only products). */
+/** Main catalogue. Includes add-on items too when `store.showAddOnsInMainGrid` is on. */
 export async function getMainProducts(category?: string): Promise<ProductCardData[]> {
   "use cache";
   cacheLife("hours");
   cacheTag("products");
-  const rows = await fetchCards({ isAddOn: false, ...(category ? { category } : {}) });
-  return rows.map(toCard);
+  const rows = await fetchCards({
+    ...(store.showAddOnsInMainGrid ? {} : { isAddOn: false }),
+    ...(category ? { category } : {}),
+  });
+  // Trending first, then the rest in the order they were added.
+  return rows.map(toCard).sort((a, b) => Number(b.isTrending) - Number(a.isTrending));
 }
 
 /**
@@ -150,7 +233,7 @@ export async function getProductBySlug(slug: string): Promise<ProductPageData | 
     include: {
       images: { orderBy: { position: "asc" } },
       videos: { orderBy: { position: "asc" } },
-      variants: { where: { active: true }, orderBy: [{ position: "asc" }] },
+      variants: { ...variantInclude, orderBy: [{ position: "asc" }] },
     },
   });
   if (!p) return null;
@@ -167,14 +250,22 @@ export async function getProductBySlug(slug: string): Promise<ProductPageData | 
     logisticName: p.logisticName,
     images: p.images.map((i) => i.url),
     videos: p.videos.map((v) => ({ id: v.id })),
-    variants: p.variants.map((v) => ({
-      id: v.id,
-      name: v.name,
-      pricePence: v.pricePence,
-      imageUrl: v.imageUrl,
-      deliveryMinDays: v.deliveryMinDays,
-      deliveryMaxDays: v.deliveryMaxDays,
-      warehouseCountry: v.warehouseCountry,
-    })),
+    variants: p.variants.map((v) => {
+      const markets: Partial<Record<MarketCode, VariantMarketData>> = {};
+      for (const code of MARKETS) {
+        const m = variantInMarket(v, code);
+        if (m) markets[code] = m;
+      }
+      return {
+        id: v.id,
+        name: v.name,
+        pricePence: v.pricePence,
+        imageUrl: v.imageUrl,
+        deliveryMinDays: v.deliveryMinDays,
+        deliveryMaxDays: v.deliveryMaxDays,
+        warehouseCountry: v.warehouseCountry,
+        markets,
+      };
+    }),
   };
 }

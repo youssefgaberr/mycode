@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import type Stripe from "stripe";
 import { store, warehouseLabels } from "@/config/store";
+import { liveStockProblems } from "@/lib/live-stock";
 import { db } from "@/lib/db";
 import { isLive, siteUrl } from "@/lib/env";
 import { basketInputSchema, priceBasket } from "@/lib/checkout";
@@ -33,6 +34,18 @@ export async function POST(request: Request) {
     );
   }
   if (basket.lines.length === 0) return Response.json({ error: "Your basket is empty." }, { status: 400 });
+  const market = store.markets[basket.market];
+  const currency = market.currency.toLowerCase();
+
+  // Live check with CJ: is everything still in stock right now?
+  const stockProblems = await liveStockProblems(basket.lines);
+  if (stockProblems.length > 0) {
+    return Response.json(
+      { error: `Sorry, ${stockProblems.join(", ")} just sold out at our supplier. Please update your basket.` },
+      { status: 409 },
+    );
+  }
+
   if (isLive() && basket.lines.some((l) => l.isDemo)) {
     return Response.json({ error: "Demo products can't be bought." }, { status: 400 });
   }
@@ -52,6 +65,8 @@ export async function POST(request: Request) {
       stripeSessionId: `pending_${crypto.randomUUID()}`,
       status: "PENDING_PAYMENT",
       isTest: !isLive(),
+      market: basket.market,
+      currency: market.currency,
       subtotalPence: t.subtotalPence,
       discountPence: t.discountPence,
       deliveryPence: t.deliveryPence,
@@ -87,14 +102,14 @@ export async function POST(request: Request) {
         ...(embedded
           ? { ui_mode: "embedded_page" as const, return_url: returnUrl }
           : { success_url: returnUrl, cancel_url: `${siteUrl()}/basket` }),
-        currency: "gbp",
-        locale: "en-GB",
+        currency,
+        locale: market.locale === "en-US" ? "en" : "en-GB",
         line_items: basket.lines.map((l) => {
           const image = l.image && /^https:\/\//.test(l.image) ? [l.image] : undefined;
           return {
             quantity: l.quantity,
             price_data: {
-              currency: "gbp",
+              currency,
               unit_amount: l.unitPricePence,
               product_data: {
                 name: l.showVariantName ? `${l.title} — ${l.variantName}` : l.title,
@@ -105,13 +120,13 @@ export async function POST(request: Request) {
           };
         }),
         discounts: coupon ? [{ coupon }] : undefined,
-        shipping_address_collection: { allowed_countries: [...store.shippingCountries] },
+        shipping_address_collection: { allowed_countries: [...market.shipTo] },
         shipping_options: [
           {
             shipping_rate_data: {
               type: "fixed_amount",
-              display_name: t.freeDelivery ? "Free UK delivery" : "UK delivery",
-              fixed_amount: { amount: t.deliveryPence, currency: "gbp" },
+              display_name: `${t.freeDelivery ? "Free " : ""}${basket.market === "GB" ? "UK" : "US"} delivery`,
+              fixed_amount: { amount: t.deliveryPence, currency },
               metadata: { from: fromLabels.join(", ") },
             },
           },

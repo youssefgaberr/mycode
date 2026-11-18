@@ -1,12 +1,26 @@
 import Link from "next/link";
 import type { ProductCardData } from "@/lib/catalog";
-import { formatGBP } from "@/lib/pricing";
+import { MARKETS, store } from "@/config/store";
+import { formatMoney } from "@/lib/pricing";
+import { MarketValue } from "@/components/market/MarketValue";
 import { ProductImage } from "./ProductImage";
 import { QuickAdd } from "./QuickAdd";
 import { daysRange } from "./delivery";
 
 export function ProductCard({ product, priority }: { product: ProductCardData; priority?: boolean }) {
-  const range = daysRange(product.deliveryMinDays, product.deliveryMaxDays);
+  const stockBadge = Object.fromEntries(
+    MARKETS.map((code) => {
+      const wh = product.markets[code]?.warehouseCountry;
+      return [
+        code,
+        wh && wh === code ? (
+          <span className="rounded-md bg-sage px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white dark:text-ink">
+            {code === "GB" ? "UK" : code} stock
+          </span>
+        ) : null,
+      ];
+    }),
+  );
   return (
     <article className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-surface transition duration-300 hover:-translate-y-1 hover:border-brand/40 hover:shadow-lift">
       <div className="relative aspect-square overflow-hidden">
@@ -23,11 +37,7 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
               Hot
             </span>
           )}
-          {product.warehouseCountry === "GB" && (
-            <span className="rounded-md bg-sage px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-white dark:text-ink">
-              UK stock
-            </span>
-          )}
+          <MarketValue values={stockBadge} />
         </div>
       </div>
       <div className="flex flex-1 flex-col gap-1 p-3.5 sm:p-4">
@@ -37,20 +47,33 @@ export function ProductCard({ product, priority }: { product: ProductCardData; p
           </Link>
         </h3>
         <p className="line-clamp-2 hidden text-sm text-muted sm:block">{product.summary}</p>
-        <div className="mt-auto flex items-end justify-between gap-2 pt-3">
-          <div>
-            <p className="font-display text-lg font-bold tabular-nums text-brand">
-              {product.hasVariantPrices && <span className="text-xs font-medium text-muted">from </span>}
-              {formatGBP(product.pricePence)}
-            </p>
-            {range && <p className="text-xs text-muted">Delivery {range} days</p>}
-          </div>
-          {product.defaultVariantId && (
-            <div className="relative z-10">
-              <QuickAdd variantId={product.defaultVariantId} title={product.title} compact />
-            </div>
+        <MarketValue
+          fallback={<p className="mt-auto pt-3 text-sm font-medium text-muted">Not available in your region</p>}
+          values={Object.fromEntries(
+            MARKETS.map((code) => {
+              const mp = product.markets[code];
+              if (!mp) return [code, undefined];
+              const range = daysRange(mp.deliveryMinDays, mp.deliveryMaxDays);
+              return [
+                code,
+                <div key={code} className="mt-auto flex items-end justify-between gap-2 pt-3">
+                  <div>
+                    <p className="font-display text-lg font-bold tabular-nums text-brand">
+                      {mp.hasVariantPrices && <span className="text-xs font-medium text-muted">from </span>}
+                      {formatMoney(mp.priceMinor, store.markets[code])}
+                    </p>
+                    {range && <p className="text-xs text-muted">Delivery {range} days</p>}
+                  </div>
+                  {mp.defaultVariantId && (
+                    <div className="relative z-10">
+                      <QuickAdd variantId={mp.defaultVariantId} title={product.title} compact />
+                    </div>
+                  )}
+                </div>,
+              ];
+            }),
           )}
-        </div>
+        />
       </div>
     </article>
   );

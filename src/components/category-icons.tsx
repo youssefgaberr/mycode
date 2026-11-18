@@ -56,7 +56,37 @@ const Baking = (p: P) => (
   </svg>
 );
 
+const Fitness = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M6 18v12M11 14v20M37 14v20M42 18v12M11 24h26" />
+  </svg>
+);
+const Pets = (p: P) => (
+  <svg {...base} {...p}>
+    <circle cx="14" cy="18" r="3.5" />
+    <circle cx="22" cy="12" r="3.5" />
+    <circle cx="30" cy="12" r="3.5" />
+    <circle cx="36" cy="19" r="3.5" />
+    <path d="M24 22c-6 0-11 8-11 12a5 5 0 0 0 7 4.5c2.5-1 5.5-1 8 0A5 5 0 0 0 35 34c0-4-5-12-11-12Z" />
+  </svg>
+);
+const Car = (p: P) => (
+  <svg {...base} {...p}>
+    <path d="M8 30v-6l4-9a3 3 0 0 1 2.8-2h18.4a3 3 0 0 1 2.8 2l4 9v6" />
+    <path d="M6 30h36v5H6z" />
+    <circle cx="14" cy="37" r="3" />
+    <circle cx="34" cy="37" r="3" />
+    <path d="M10 24h28" />
+  </svg>
+);
+
 export const categoryIcons: Record<string, (p: P) => React.JSX.Element> = {
+  kitchen: Cooking,
+  home: Storage,
+  fitness: Fitness,
+  pets: Pets,
+  car: Car,
+  // older slugs
   cooking: Cooking,
   prep: Prep,
   drinks: Drinks,
@@ -66,9 +96,9 @@ export const categoryIcons: Record<string, (p: P) => React.JSX.Element> = {
 
 /** Soft background tints per category, from the brand palette. */
 export const categoryTints: Record<string, string> = {
-  cooking: "bg-brand-soft text-brand",
-  prep: "bg-sage-soft text-sage",
-  drinks: "bg-honey-soft text-accent-fg",
-  storage: "bg-surface-3 text-fg",
-  baking: "bg-brand-soft text-brand",
+  kitchen: "bg-brand-soft text-brand",
+  home: "bg-sage-soft text-sage",
+  fitness: "bg-honey-soft text-accent-fg",
+  pets: "bg-surface-3 text-fg",
+  car: "bg-brand-soft text-brand",
 };

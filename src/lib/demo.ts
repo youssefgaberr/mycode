@@ -6,7 +6,8 @@
 import { productContent } from "@/content/products";
 import { db } from "@/lib/db";
 import { slugify } from "@/lib/cj/catalog";
-import { priceVariant, formatGBP } from "@/lib/pricing";
+import { priceForMarket, priceVariant, formatGBP } from "@/lib/pricing";
+import { MARKETS, store } from "@/config/store";
 
 /** Invented USD costs, chosen to show a mix of main products and add-ons. */
 const demo: Record<string, { cost: number; ship: number; wh: string; days: [number, number]; variants?: string[] }> = {
@@ -82,6 +83,33 @@ export async function seedDemoProducts(opts: { force?: boolean; log?: (s: string
         position: i,
       })),
     });
+    // Per-market prices (demo: the US ships from the international warehouse).
+    for (const v of await db.variant.findMany({ where: { productId: product.id } })) {
+      for (const code of MARKETS) {
+        const m = store.markets[code];
+        const wh = code === "GB" ? d.wh : "CN";
+        const ship = code === "GB" ? d.ship : d.ship + 1.5;
+        const pm = priceForMarket(d.cost, ship, m);
+        await db.variantMarket.create({
+          data: {
+            variantId: v.id,
+            market: code,
+            currency: m.currency,
+            priceMinor: pm.priceMinor,
+            supplierCostMinor: pm.supplierCostMinor,
+            shippingCostMinor: pm.shippingCostMinor,
+            estProfitMinor: pm.estProfitMinor,
+            isAddOn: pm.isAddOn,
+            shippingCostUsd: ship,
+            warehouseCountry: wh,
+            logisticName: "Demo Post",
+            deliveryMinDays: code === "GB" ? d.days[0] : 6,
+            deliveryMaxDays: code === "GB" ? d.days[1] : 12,
+            stock: 100,
+          },
+        });
+      }
+    }
     await db.productImage.deleteMany({ where: { productId: product.id } });
     await db.productImage.createMany({
       data: [1, 2, 3].map((n, position) => ({ productId: product.id, url: `/demo/${content.key}-${n}.svg`, position })),

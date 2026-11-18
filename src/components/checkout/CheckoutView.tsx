@@ -6,7 +6,9 @@ import { loadStripe } from "@stripe/stripe-js";
 import { EmbeddedCheckout, EmbeddedCheckoutProvider } from "@stripe/react-stripe-js";
 import { useBasket } from "@/components/basket/BasketProvider";
 import type { PricedBasket } from "@/lib/checkout";
-import { formatGBP } from "@/lib/pricing";
+import { store } from "@/config/store";
+import { formatMoney } from "@/lib/pricing";
+import { useMarket } from "@/components/market/useMarket";
 import { LockIcon } from "@/components/icons";
 import { ProductImage } from "@/components/product/ProductImage";
 
@@ -18,6 +20,8 @@ import { ProductImage } from "@/components/product/ProductImage";
  */
 export function CheckoutView({ publishableKey }: { publishableKey: string }) {
   const { lines, ready } = useBasket();
+  const market = useMarket();
+  const money = (n: number) => formatMoney(n, store.markets[market]);
   const [error, setError] = useState<string | null>(null);
   const [quote, setQuote] = useState<PricedBasket | null>(null);
   const stripePromise = useMemo(() => (publishableKey ? loadStripe(publishableKey) : null), [publishableKey]);
@@ -29,7 +33,7 @@ export function CheckoutView({ publishableKey }: { publishableKey: string }) {
       secretPromise.current = fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ lines }),
+        body: JSON.stringify({ lines, market }),
       }).then(async (res) => {
         const data = await res.json();
         if (res.ok && data.url) {
@@ -46,21 +50,21 @@ export function CheckoutView({ publishableKey }: { publishableKey: string }) {
       });
     }
     return secretPromise.current;
-  }, [lines]);
+  }, [lines, market]);
 
   useEffect(() => {
     if (!ready || lines.length === 0) return;
     fetch("/api/basket/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lines }),
+      body: JSON.stringify({ lines, market }),
     })
       .then((r) => r.json())
       .then(setQuote)
       .catch(() => undefined);
     // Hosted fallback: no publishable key, so go straight to Stripe.
     if (!publishableKey) fetchClientSecret().catch(() => undefined);
-  }, [ready, lines, publishableKey, fetchClientSecret]);
+  }, [ready, lines, market, publishableKey, fetchClientSecret]);
 
   if (!ready) return <div className="mt-6 h-96 animate-pulse rounded-3xl bg-surface-2" />;
 
@@ -109,7 +113,7 @@ export function CheckoutView({ publishableKey }: { publishableKey: string }) {
                     <span className="block truncate font-medium">{l.title}</span>
                     {l.showVariantName && <span className="text-muted">{l.variantName}</span>}
                   </span>
-                  <span className="tabular-nums">{formatGBP(l.lineTotalPence)}</span>
+                  <span className="tabular-nums">{money(l.lineTotalPence)}</span>
                 </li>
               ))}
             </ul>
@@ -117,21 +121,23 @@ export function CheckoutView({ publishableKey }: { publishableKey: string }) {
               {quote.totals.discountPence > 0 && (
                 <div className="flex justify-between text-success">
                   <dt>Multi-buy discount</dt>
-                  <dd>−{formatGBP(quote.totals.discountPence)}</dd>
+                  <dd>−{money(quote.totals.discountPence)}</dd>
                 </div>
               )}
               <div className="flex justify-between">
                 <dt>Delivery</dt>
-                <dd>{quote.totals.deliveryPence ? formatGBP(quote.totals.deliveryPence) : "Free"}</dd>
+                <dd>{quote.totals.deliveryPence ? money(quote.totals.deliveryPence) : "Free"}</dd>
               </div>
               <div className="flex justify-between text-base font-bold">
                 <dt>Total</dt>
-                <dd>{formatGBP(quote.totals.totalPence)}</dd>
+                <dd>{money(quote.totals.totalPence)}</dd>
               </div>
-              <div className="flex justify-between text-muted">
-                <dt>Includes VAT</dt>
-                <dd>{formatGBP(quote.totals.vatPence)}</dd>
-              </div>
+              {store.markets[market].pricesIncludeTax && (
+                <div className="flex justify-between text-muted">
+                  <dt>Includes VAT</dt>
+                  <dd>{money(quote.totals.vatPence)}</dd>
+                </div>
+              )}
             </dl>
           </>
         ) : (

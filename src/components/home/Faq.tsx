@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { store } from "@/config/store";
-import { formatGBPShort, toPence } from "@/lib/pricing";
+import { DeliveryCountry, DeliveryFee, FreeDeliveryFrom, TaxNote } from "@/components/market/MarketText";
 
 /** Home-page FAQ. Answers match the policy pages — keep them in sync. */
 export function Faq() {
@@ -20,8 +20,8 @@ export function Faq() {
       q: "How much is delivery?",
       a: (
         <>
-          Delivery is free on orders of {formatGBPShort(toPence(b.freeDeliveryThreshold))} or more (after any discount),
-          otherwise {formatGBPShort(toPence(b.deliveryFee))} to anywhere in the UK.
+          Delivery is free on orders of <FreeDeliveryFrom /> or more (after any discount), otherwise <DeliveryFee /> to
+          anywhere in the <DeliveryCountry />. We deliver to the UK and the United States.
         </>
       ),
     },
@@ -55,10 +55,11 @@ export function Faq() {
       ),
     },
     {
-      q: "Will I have to pay customs or extra VAT?",
+      q: "Will I have to pay customs or import fees?",
       a: (
         <>
-          No — our prices include UK VAT. If a carrier ever asks you for a fee, please{" "}
+          <TaxNote />. You shouldn&apos;t be asked to pay anything when your parcel arrives — if a carrier ever asks you for
+          a fee, please{" "}
           <Link href="/contact" className="text-brand underline">
             contact us
           </Link>{" "}

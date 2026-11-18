@@ -28,11 +28,13 @@ export function DeliveryEstimate({
   maxDays,
   warehouseCountry,
   carrier,
+  countryLabel = "UK",
 }: {
   minDays: number | null;
   maxDays: number | null;
   warehouseCountry: string;
   carrier: string | null;
+  countryLabel?: string;
 }) {
   const range = daysRange(minDays, maxDays);
   const dates = useSyncExternalStore(
@@ -54,7 +56,9 @@ export function DeliveryEstimate({
         <div className="text-sm">
           {range ? (
             <>
-              <p className="font-semibold">Estimated delivery: {range} working days</p>
+              <p className="font-semibold">
+                Estimated delivery to the {countryLabel}: {range} working days
+              </p>
               {dates && <p className="text-fg">Arrives around {dates}</p>}
             </>
           ) : (

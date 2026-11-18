@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { ProductCardData } from "@/lib/catalog";
-import { formatGBP } from "@/lib/pricing";
+import { store } from "@/config/store";
+import { formatMoney } from "@/lib/pricing";
+import { MarketValue, perMarket } from "@/components/market/MarketValue";
 import { ProductImage } from "./ProductImage";
 import { QuickAdd } from "./QuickAdd";
 
@@ -32,9 +34,22 @@ export function CompleteYourOrder({
               <Link href={`/products/${p.slug}`} className="block truncate text-sm font-semibold hover:underline">
                 {p.title}
               </Link>
-              <p className="text-sm">{formatGBP(p.pricePence)}</p>
+              <p className="text-sm">
+                <MarketValue
+                  fallback={<span className="text-muted">Not available in your region</span>}
+                  values={perMarket((m, code) => {
+                    const mp = p.markets[code];
+                    return mp ? formatMoney(mp.priceMinor, store.markets[code]) : undefined;
+                  })}
+                />
+              </p>
             </div>
-            {p.defaultVariantId && <QuickAdd variantId={p.defaultVariantId} title={p.title} />}
+            <MarketValue
+              values={perMarket((_m, code) => {
+                const id = p.markets[code]?.defaultVariantId;
+                return id ? <QuickAdd variantId={id} title={p.title} /> : undefined;
+              })}
+            />
           </li>
         ))}
       </ul>

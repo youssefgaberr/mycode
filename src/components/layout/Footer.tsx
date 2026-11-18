@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { store } from "@/config/store";
 import { PanMark } from "@/components/category-icons";
+import { CurrencyCode, TaxNote } from "@/components/market/MarketText";
 
 const shop = store.categories.map((c) => ({ href: `/shop/${c.slug}`, label: c.name }));
 const help = [
@@ -57,7 +58,7 @@ export function Footer() {
       </div>
       <div className="border-t border-white/10">
         <p className="mx-auto max-w-6xl px-4 py-5 text-xs text-slate-400">
-          © {store.name}. All prices in GBP and include VAT. Secure payments by Stripe.
+          © {store.name}. Prices in <CurrencyCode /> · <TaxNote />. Secure payments by Stripe.
         </p>
       </div>
     </footer>

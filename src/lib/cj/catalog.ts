@@ -5,10 +5,11 @@
  * Shared by `npm run import`, `npm run sync`, the admin "Re-sync" button and
  * the daily sync cron.
  */
-import { store, warehouseLabels } from "@/config/store";
+import { MARKETS, store, warehouseLabels, type MarketCode } from "@/config/store";
 import type { ProductContent } from "@/content/products";
 import { db } from "@/lib/db";
-import { priceVariant } from "@/lib/pricing";
+import { priceForMarket, priceVariant } from "@/lib/pricing";
+import type { Prisma } from "@/generated/prisma/client";
 import * as cj from "./client";
 import type { CjFreightOption, CjInventoryByPid, CjListProduct, CjProductDetail, CjVariant } from "./types";
 
@@ -121,6 +122,7 @@ export async function buildOffer(
   quote: QuoteFn,
   usdToGbp?: number,
   diag?: (s: string) => void,
+  warehouses: readonly string[] = store.warehousePreference,
 ): Promise<ProductOffer | null> {
   const variants = (detail.variants ?? []).filter((v) => v.vid && num(v.variantSellPrice) > 0);
   const stock = stockByVariant(detail, inventory);
@@ -130,7 +132,7 @@ export async function buildOffer(
     diag(`    stock by warehouse: ${[...totals].map(([c, q]) => `${c}=${q}`).join(", ") || "none reported"} (${variants.length} priced variants)`);
   }
 
-  for (const country of store.warehousePreference) {
+  for (const country of warehouses) {
     const inStock = variants
       .map((v, i) => ({ v, i, qty: stock.get(v.vid)?.get(country) ?? 0 }))
       .filter((x) => x.qty >= store.minimumWarehouseStock)
@@ -236,13 +238,57 @@ export function slugify(s: string) {
     .replace(/^-|-$/g, "");
 }
 
+export type MarketOffers = Partial<Record<MarketCode, ProductOffer | null>>;
+
+/**
+ * Writes each variant's price, shipping and availability per market.
+ * Variants a market can't ship are marked unavailable there.
+ */
+async function writeMarketRows(tx: Prisma.TransactionClient, productId: string, offers: MarketOffers) {
+  const variants = await tx.variant.findMany({ where: { productId }, select: { id: true, cjVariantId: true } });
+  for (const code of MARKETS) {
+    const m = store.markets[code];
+    const offer = offers[code];
+    for (const v of variants) {
+      const o = offer?.variants.find((x) => x.cjVariantId === v.cjVariantId);
+      if (!o) {
+        await tx.variantMarket.updateMany({ where: { variantId: v.id, market: code }, data: { available: false, stock: 0 } });
+        continue;
+      }
+      const priced = priceForMarket(o.supplierCostUsd, o.shippingCostUsd, m);
+      const row = {
+        currency: m.currency,
+        priceMinor: priced.priceMinor,
+        supplierCostMinor: priced.supplierCostMinor,
+        shippingCostMinor: priced.shippingCostMinor,
+        estProfitMinor: priced.estProfitMinor,
+        isAddOn: priced.isAddOn,
+        shippingCostUsd: o.shippingCostUsd,
+        warehouseCountry: offer!.warehouseCountry,
+        logisticName: o.logisticName,
+        deliveryMinDays: o.deliveryMinDays,
+        deliveryMaxDays: o.deliveryMaxDays,
+        stock: o.stock,
+        available: true,
+      };
+      await tx.variantMarket.upsert({
+        where: { variantId_market: { variantId: v.id, market: code } },
+        create: { variantId: v.id, market: code, ...row },
+        update: row,
+      });
+    }
+  }
+}
+
 export async function saveProduct(args: {
   content: ProductContent;
   detail: CjProductDetail;
   offer: ProductOffer;
+  offers?: MarketOffers;
   videos: { cjVideoId?: string; url: string }[];
 }) {
   const { content, detail, offer, videos } = args;
+  const offers: MarketOffers = args.offers ?? { GB: offer };
   const main = offer.variants[0];
   const images = collectImages(detail, offer);
   const productData = {
@@ -293,6 +339,7 @@ export async function saveProduct(args: {
     await tx.productVideo.createMany({
       data: videos.map((v, position) => ({ productId: product.id, cjVideoId: v.cjVideoId ?? null, url: v.url, position })),
     });
+    await writeMarketRows(tx, product.id, offers);
     return product;
   });
 }
@@ -346,15 +393,23 @@ export async function fetchOffer(pid: string, diag?: (s: string) => void) {
     console.warn(`  inventory lookup failed for ${pid}: ${(err as Error).message}`);
     diag?.(`    inventory lookup failed: ${(err as Error).message}`);
   }
-  const offer = await buildOffer(detail, inventory, cjQuote, undefined, diag);
-  return { detail, offer };
+  // One offer per market: each ships from its own preferred warehouses with
+  // a CJ shipping quote to that country.
+  const offers: MarketOffers = {};
+  for (const code of MARKETS) {
+    const m = store.markets[code];
+    const quote: QuoteFn = (from, vid) => cj.freightCalculate(from, m.shipTo[0], [{ vid, quantity: 1 }]);
+    if (diag && code !== "GB") diag(`    ${code} market:`);
+    offers[code] = await buildOffer(detail, inventory, quote, undefined, code === "GB" ? diag : undefined, m.warehouses);
+  }
+  return { detail, offer: offers.GB ?? null, offers };
 }
 
 /** Search CJ for the best product for one content entry. */
 export async function findBestMatch(content: ProductContent, log: (s: string) => void = console.log) {
   if (content.cjProductId) {
-    const { detail, offer } = await fetchOffer(content.cjProductId);
-    return offer ? { detail, offer } : null;
+    const found = await fetchOffer(content.cjProductId, log);
+    return found.offer ? { detail: found.detail, offer: found.offer, offers: found.offers } : null;
   }
 
   const seen = new Map<string, { p: CjListProduct; score: number }>();
@@ -383,8 +438,8 @@ export async function findBestMatch(content: ProductContent, log: (s: string) =>
   for (const { p, score } of ranked) {
     log(`  → ${p.nameEn} (score ${score.toFixed(1)})`);
     try {
-      const { detail, offer } = await fetchOffer(p.id, log);
-      if (offer) return { detail, offer };
+      const found = await fetchOffer(p.id, log);
+      if (found.offer) return { detail: found.detail, offer: found.offer, offers: found.offers };
       log(`    no in-stock variant with UK shipping; trying next`);
     } catch (err) {
       log(`    failed: ${(err as Error).message}`);
@@ -403,7 +458,7 @@ export async function syncCatalog(log: (s: string) => void = console.log) {
   const result = { updated: 0, hidden: 0, failed: 0, priceChanges: [] as string[] };
   for (const product of products) {
     try {
-      const { detail, offer } = await fetchOffer(product.cjProductId);
+      const { detail, offer, offers } = await fetchOffer(product.cjProductId);
       if (!offer || detail.status === "0") {
         await db.product.update({ where: { id: product.id }, data: { inStock: false, lastSyncedAt: new Date() } });
         await db.variant.updateMany({ where: { productId: product.id }, data: { active: false, stock: 0 } });
@@ -442,6 +497,7 @@ export async function syncCatalog(log: (s: string) => void = console.log) {
           const row = variantRow(product.id, offer, v, i);
           await tx.variant.upsert({ where: { cjVariantId: v.cjVariantId }, create: row, update: row });
         }
+        await writeMarketRows(tx, product.id, offers);
       });
       result.updated++;
       log(`  ${product.title}: ${offer.variants.length} variant(s) in stock from ${offer.warehouseCountry}`);

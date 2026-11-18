@@ -6,7 +6,8 @@
 import { Resend } from "resend";
 import { store } from "@/config/store";
 import { siteUrl } from "@/lib/env";
-import { formatGBP } from "@/lib/pricing";
+import { formatMoney } from "@/lib/pricing";
+import { marketConfig } from "@/config/store";
 
 export interface EmailMessage {
   to: string;
@@ -44,6 +45,7 @@ ${body}
 
 interface EmailOrder {
   number: string;
+  market?: string;
   customerName: string | null;
   totalPence: number;
   deliveryPence: number;
@@ -52,6 +54,8 @@ interface EmailOrder {
 }
 
 export function orderConfirmationEmail(order: EmailOrder & { email: string }): EmailMessage {
+  const m = marketConfig(order.market);
+  const formatGBP = (minor: number) => formatMoney(minor, m);
   const first = order.customerName?.split(" ")[0] ?? "there";
   const rows = order.items
     .map(
@@ -65,7 +69,7 @@ export function orderConfirmationEmail(order: EmailOrder & { email: string }): E
 <table role="presentation" width="100%" style="font-size:14px;border-top:1px solid #e7e0d2;margin-top:16px">${rows}
 ${order.discountPence ? `<tr><td style="padding:6px 0;color:#15803d">Multi-buy discount</td><td align="right" style="color:#15803d">−${formatGBP(order.discountPence)}</td></tr>` : ""}
 <tr><td style="padding:6px 0">Delivery</td><td align="right">${order.deliveryPence ? formatGBP(order.deliveryPence) : "Free"}</td></tr>
-<tr><td style="padding:6px 0;font-weight:700;border-top:1px solid #e7e0d2">Total paid (incl. VAT)</td><td align="right" style="font-weight:700;border-top:1px solid #e7e0d2">${formatGBP(order.totalPence)}</td></tr></table>
+<tr><td style="padding:6px 0;font-weight:700;border-top:1px solid #e7e0d2">Total paid${m.pricesIncludeTax ? " (incl. VAT)" : ""}</td><td align="right" style="font-weight:700;border-top:1px solid #e7e0d2">${formatGBP(order.totalPence)}</td></tr></table>
 <p style="font-size:14px">You can cancel within 14 days of delivery — see our <a href="${siteUrl()}/returns">returns policy</a>.</p>`,
   );
   const text = `Thanks for your order, ${first}!\n\nOrder ${order.number}\n${order.items

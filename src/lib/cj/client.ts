@@ -219,6 +219,16 @@ export function getInventoryByPid(pid: string) {
   return call<CjInventoryByPid>("GET", "/product/stock/getInventoryByPid", { query: { pid } });
 }
 
+/** Live stock for one variant, per warehouse country. */
+export async function getStockByVid(vid: string): Promise<{ countryCode: string; totalInventoryNum?: number | string }[]> {
+  const data = await call<{ countryCode: string; totalInventoryNum?: number | string }[] | null>(
+    "GET",
+    "/product/stock/queryByVid",
+    { query: { vid } },
+  );
+  return data ?? [];
+}
+
 export async function getProductVideos(pid: string): Promise<CjVideo[]> {
   const data = await call<CjVideo[] | null>("POST", "/product/queryVideosByProductId", {
     body: { productId: pid },

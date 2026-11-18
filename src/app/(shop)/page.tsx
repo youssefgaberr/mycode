@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { store } from "@/config/store";
 import { getMainProducts, getTrendingProducts } from "@/lib/catalog";
-import { formatGBPShort, toPence } from "@/lib/pricing";
+import { DeliveryCountry, FreeDeliveryFrom, TaxNote } from "@/components/market/MarketText";
 import { ProductCard, ProductGrid } from "@/components/product/ProductCard";
 import { LockIcon, ReturnIcon, TagIcon, TruckIcon } from "@/components/icons";
 import { categoryIcons, categoryTints } from "@/components/category-icons";
@@ -11,7 +11,7 @@ export default async function HomePage() {
   const [products, { trending, products: strip }] = await Promise.all([getMainProducts(), getTrendingProducts()]);
   const b = store.basket;
   const highlights = [
-    { big: formatGBPShort(toPence(b.freeDeliveryThreshold)), small: "free UK delivery from", icon: TruckIcon },
+    { big: <FreeDeliveryFrom />, small: "free delivery from", icon: TruckIcon },
     { big: `${b.multiBuyPercentOff}%`, small: `off when you buy ${b.multiBuyMinItems}+`, icon: TagIcon },
     { big: "14 days", small: "to change your mind", icon: ReturnIcon },
     { big: "Stripe", small: "secure checkout", icon: LockIcon },
@@ -24,15 +24,15 @@ export default async function HomePage() {
         <div className="mx-auto max-w-4xl px-4 pb-14 pt-14 text-center sm:pb-20 sm:pt-20">
           <p className="inline-flex animate-fade-up items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted shadow-soft">
             <span className="rounded-full bg-danger px-1.5 py-px text-[10px] font-extrabold uppercase text-white">New</span>
-            Clever gadgets for UK kitchens
+            Trending gadgets · UK &amp; US delivery
           </p>
           <h1 className="font-display mt-6 animate-fade-up text-[2.5rem] font-extrabold leading-[1.08] sm:text-6xl">
-            Kitchen gadgets that
+            Clever gadgets that
             <br />
-            <span className="text-brand">make cooking easier</span>
+            <span className="text-brand">make life easier</span>
           </h1>
           <p className="mx-auto mt-5 max-w-xl animate-fade-up text-lg leading-relaxed text-muted">
-            Smart, affordable tools for everyday cooking, prep and storage — delivered to your door.
+            Clever, affordable gadgets for your kitchen, home, travel, pets and car — delivered to your door in the UK and US.
           </p>
           <div className="mt-8 flex animate-fade-up flex-wrap justify-center gap-3">
             <Link
@@ -49,7 +49,7 @@ export default async function HomePage() {
             </Link>
           </div>
           <p className="mt-4 text-xs text-muted">
-            Free UK delivery from {formatGBPShort(toPence(b.freeDeliveryThreshold))} · 14-day returns · Prices include VAT
+            Free <DeliveryCountry /> delivery from <FreeDeliveryFrom /> · 14-day returns · <TaxNote />
           </p>
         </div>
       </section>
@@ -130,7 +130,7 @@ export default async function HomePage() {
       <section aria-label="Why shop with us" className="mx-auto max-w-6xl px-4 pt-14">
         <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {highlights.map(({ big, small, icon: Icon }) => (
-            <li key={small} className="rounded-2xl border border-border bg-surface p-5 text-center">
+            <li key={String(small)} className="rounded-2xl border border-border bg-surface p-5 text-center">
               <Icon className="mx-auto size-6 text-brand" />
               <p className="font-display mt-2 text-2xl font-extrabold sm:text-3xl">{big}</p>
               <p className="mt-1 text-sm text-muted">{small}</p>
@@ -168,7 +168,7 @@ export default async function HomePage() {
           </p>
           <p className="relative mx-auto mt-3 max-w-md text-white/75">
             Mix and match anything in the shop. The discount appears automatically in your basket — and orders of{" "}
-            {formatGBPShort(toPence(b.freeDeliveryThreshold))}+ ship free.
+            <FreeDeliveryFrom />+ ship free.
           </p>
           <Link
             href="/shop"

@@ -15,7 +15,8 @@ import { seedDemoProducts } from "@/lib/demo";
 import * as cj from "@/lib/cj/client";
 import { checkTracking, retryCjSubmission } from "@/lib/orders";
 import { getStripe } from "@/lib/stripe";
-import { formatGBP } from "@/lib/pricing";
+import { formatGBP, formatMoney } from "@/lib/pricing";
+import { marketConfig } from "@/config/store";
 
 const back = (path: string, msg: string): never => redirect(`${path}?msg=${encodeURIComponent(msg)}`);
 
@@ -141,10 +142,10 @@ export async function useForCoreProduct(formData: FormData) {
   const candidate = await db.sourcingCandidate.findUniqueOrThrow({ where: { id } });
   let msg: string;
   try {
-    const { detail, offer } = await fetchOffer(candidate.cjProductId);
+    const { detail, offer, offers } = await fetchOffer(candidate.cjProductId);
     if (!offer) throw new Error("No in-stock variant ships to the UK any more.");
     const videos = await fetchVideos(candidate.cjProductId);
-    const product = await saveProduct({ content: content!, detail, offer, videos });
+    const product = await saveProduct({ content: content!, detail, offer, offers, videos });
     const pinKey = `${PIN_PREFIX}${key}`;
     await db.setting.upsert({
       where: { key: pinKey },
@@ -224,7 +225,7 @@ export async function refundOrder(formData: FormData) {
       { idempotencyKey: `refund_${order.id}_${remaining}` },
     );
     await db.order.update({ where: { id }, data: { status: "REFUNDED", refundedPence: order.totalPence, attentionReason: null } });
-    msg = `Refunded ${formatGBP(remaining)} for ${order.number}. If CJ hasn't shipped it, cancel the CJ order in your CJ dashboard.`;
+    msg = `Refunded ${formatMoney(remaining, marketConfig(order.market))} for ${order.number}. If CJ hasn't shipped it, cancel the CJ order in your CJ dashboard.`;
   } catch (err) {
     msg = `Refund failed: ${(err as Error).message}`;
   }
@@ -299,7 +300,7 @@ export async function publishCandidate(formData: FormData) {
   const candidate = await db.sourcingCandidate.findUniqueOrThrow({ where: { id: f.id } });
   let msg: string;
   try {
-    const { detail, offer } = await fetchOffer(candidate.cjProductId);
+    const { detail, offer, offers } = await fetchOffer(candidate.cjProductId);
     if (!offer) throw new Error("No in-stock variant ships to the UK any more.");
     const videos = await fetchVideos(candidate.cjProductId);
     const product = await saveProduct({
@@ -315,6 +316,7 @@ export async function publishCandidate(formData: FormData) {
       },
       detail,
       offer,
+      offers,
       videos,
     });
     await db.sourcingCandidate.update({ where: { id: f.id }, data: { status: "PUBLISHED", productId: product.id } });

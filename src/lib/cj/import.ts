@@ -9,6 +9,8 @@ import { db } from "@/lib/db";
 import { formatGBP } from "@/lib/pricing";
 import { fetchVideos, findBestMatch, saveProduct } from "./catalog";
 
+export const PIN_PREFIX = "pin:";
+
 export async function importProducts(opts: { keys?: string[]; log?: (s: string) => void } = {}) {
   const log = opts.log ?? console.log;
   const targets = opts.keys?.length ? productContent.filter((c) => opts.keys!.includes(c.key)) : productContent;
@@ -16,8 +18,17 @@ export async function importProducts(opts: { keys?: string[]; log?: (s: string) 
   const lines: string[] = [];
   let ok = 0;
 
-  for (const content of targets) {
-    log(`\n▶ ${content.key}`);
+  // Products you picked by hand in /admin/sourcing ("Use for…") are pinned.
+  const pins = new Map(
+    (await db.setting.findMany({ where: { key: { startsWith: PIN_PREFIX } } })).map((row) => [
+      row.key.slice(PIN_PREFIX.length),
+      row.value,
+    ]),
+  );
+
+  for (const base of targets) {
+    const content = pins.has(base.key) ? { ...base, cjProductId: pins.get(base.key) } : base;
+    log(`\n▶ ${content.key}${pins.has(base.key) ? " (pinned)" : ""}`);
     try {
       const match = await findBestMatch(content, log);
       if (!match) {

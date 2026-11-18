@@ -70,8 +70,16 @@ export function parseAging(aging: string | undefined): { min: number | null; max
 }
 
 /** Cheapest option; ties go to the faster one. */
+/** A price CJ actually stated (0 is valid: UK-warehouse delivery is often free). */
+function hasPrice(o: CjFreightOption) {
+  const v = o.logisticPrice ?? o.totalPostageFee;
+  if (v === undefined || v === null || v === "") return false;
+  const n = typeof v === "number" ? v : parseFloat(String(v));
+  return Number.isFinite(n) && n >= 0;
+}
+
 export function pickFreight(options: CjFreightOption[]): CjFreightOption | null {
-  const valid = options.filter((o) => o.logisticName && num(o.logisticPrice ?? o.totalPostageFee) > 0);
+  const valid = options.filter((o) => o.logisticName && hasPrice(o));
   if (valid.length === 0) return null;
   return valid.sort((a, b) => {
     const diff = num(a.logisticPrice ?? a.totalPostageFee) - num(b.logisticPrice ?? b.totalPostageFee);
@@ -112,9 +120,15 @@ export async function buildOffer(
   inventory: CjInventoryByPid | null,
   quote: QuoteFn,
   usdToGbp?: number,
+  diag?: (s: string) => void,
 ): Promise<ProductOffer | null> {
   const variants = (detail.variants ?? []).filter((v) => v.vid && num(v.variantSellPrice) > 0);
   const stock = stockByVariant(detail, inventory);
+  if (diag) {
+    const totals = new Map<string, number>();
+    for (const m of stock.values()) for (const [c, q] of m) totals.set(c, (totals.get(c) ?? 0) + q);
+    diag(`    stock by warehouse: ${[...totals].map(([c, q]) => `${c}=${q}`).join(", ") || "none reported"} (${variants.length} priced variants)`);
+  }
 
   for (const country of store.warehousePreference) {
     const inStock = variants
@@ -131,9 +145,12 @@ export async function buildOffer(
       if (!quoteCache.has(band)) {
         let best: CjFreightOption | null = null;
         try {
-          best = pickFreight(await quote(country, v.vid));
+          const options = await quote(country, v.vid);
+          best = pickFreight(options);
+          if (!best) diag?.(`    no usable UK shipping from ${country} (${options.length} option(s) returned)`);
         } catch (err) {
           console.warn(`  freight quote failed for ${v.vid} from ${country}: ${(err as Error).message}`);
+          diag?.(`    shipping quote from ${country} failed: ${(err as Error).message}`);
         }
         quoteCache.set(band, best);
       }
@@ -320,15 +337,16 @@ export async function fetchVideos(pid: string) {
   }
 }
 
-export async function fetchOffer(pid: string) {
+export async function fetchOffer(pid: string, diag?: (s: string) => void) {
   const detail = await cj.getProductDetail(pid);
   let inventory: CjInventoryByPid | null = null;
   try {
     inventory = await cj.getInventoryByPid(pid);
   } catch (err) {
     console.warn(`  inventory lookup failed for ${pid}: ${(err as Error).message}`);
+    diag?.(`    inventory lookup failed: ${(err as Error).message}`);
   }
-  const offer = await buildOffer(detail, inventory, cjQuote);
+  const offer = await buildOffer(detail, inventory, cjQuote, undefined, diag);
   return { detail, offer };
 }
 
@@ -365,7 +383,7 @@ export async function findBestMatch(content: ProductContent, log: (s: string) =>
   for (const { p, score } of ranked) {
     log(`  → ${p.nameEn} (score ${score.toFixed(1)})`);
     try {
-      const { detail, offer } = await fetchOffer(p.id);
+      const { detail, offer } = await fetchOffer(p.id, log);
       if (offer) return { detail, offer };
       log(`    no in-stock variant with UK shipping; trying next`);
     } catch (err) {

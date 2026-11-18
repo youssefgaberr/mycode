@@ -6,7 +6,8 @@ import { formatGBP } from "@/lib/pricing";
 import { store, warehouseLabels } from "@/config/store";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, StatusBadge, btn, btnPrimary } from "@/components/admin/ui";
-import { discoverTrending, publishCandidate, setCandidateStatus } from "../actions";
+import { discoverTrending, publishCandidate, searchCj, setCandidateStatus, useForCoreProduct } from "../actions";
+import { productContent } from "@/content/products";
 
 export const maxDuration = 300;
 
@@ -34,6 +35,10 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
     db.sourcingCandidate.groupBy({ by: ["status"], _count: true }),
   ]);
   const count = (s: string) => counts.find((c) => c.status === s)?._count ?? 0;
+  const lastRun = await db.syncLog.findFirst({
+    where: { kind: { in: ["admin-discover", "admin-search", "discover"] } },
+    orderBy: { startedAt: "desc" },
+  });
 
   return (
     <div className="space-y-6">
@@ -56,6 +61,30 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
         Discovery searches CJ and saves up to 12 new products per run (takes 2–4 minutes; keep this page open). Run it
         again for more.
       </p>
+
+      <form action={searchCj} className="flex flex-wrap items-end gap-2 rounded-2xl border border-border bg-surface p-4">
+        <label className="min-w-0 flex-1 text-sm font-semibold">
+          Search CJ for a specific product
+          <input
+            name="keyword"
+            required
+            minLength={2}
+            maxLength={80}
+            placeholder="e.g. silicone air fryer liner"
+            className="mt-1 h-11 w-full rounded-lg border border-border bg-bg px-3 font-normal"
+          />
+        </label>
+        <SubmitButton className={btnPrimary} pendingText="Searching… (about 1 min)">
+          Search CJ
+        </SubmitButton>
+      </form>
+
+      {lastRun?.summary && (
+        <details className="text-xs">
+          <summary className="cursor-pointer text-muted">Last run log</summary>
+          <pre className="mt-2 max-h-80 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-3">{lastRun.summary}</pre>
+        </details>
+      )}
 
       <nav aria-label="Filter" className="flex flex-wrap gap-2">
         {FILTERS.map((s) => (
@@ -161,6 +190,33 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
                   <Link href="/admin/products" className={btn}>
                     View in products
                   </Link>
+                )}
+                {c.status !== "PUBLISHED" && (
+                  <form action={useForCoreProduct} className="flex flex-wrap items-center gap-1">
+                    <input type="hidden" name="id" value={c.id} />
+                    <label className="sr-only" htmlFor={`use-${c.id}`}>
+                      Use this listing for
+                    </label>
+                    <select
+                      id={`use-${c.id}`}
+                      name="contentKey"
+                      required
+                      defaultValue=""
+                      className="h-8 rounded-full border border-border bg-bg px-2 text-xs"
+                    >
+                      <option value="" disabled>
+                        Use for core product…
+                      </option>
+                      {productContent.map((pc) => (
+                        <option key={pc.key} value={pc.key}>
+                          {pc.title}
+                        </option>
+                      ))}
+                    </select>
+                    <SubmitButton className={btn} pendingText="Saving…">
+                      Use
+                    </SubmitButton>
+                  </form>
                 )}
               </div>
 

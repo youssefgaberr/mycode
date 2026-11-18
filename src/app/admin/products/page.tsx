@@ -21,7 +21,7 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
       include: { variants: { where: { active: true } }, images: { take: 1, orderBy: { position: "asc" } }, videos: true },
       orderBy: [{ isAddOn: "asc" }, { createdAt: "asc" }],
     }),
-    db.syncLog.findFirst({ where: { kind: "sync" }, orderBy: { startedAt: "desc" } }),
+    db.syncLog.findFirst({ where: { kind: { in: ["sync", "admin-import"] } }, orderBy: { startedAt: "desc" } }),
   ]);
 
   return (
@@ -59,7 +59,7 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
       </p>
       {lastSync?.summary && (
         <details className="text-xs">
-          <summary className="cursor-pointer text-muted">Last sync log</summary>
+          <summary className="cursor-pointer text-muted">Last sync / import log</summary>
           <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-surface-2 p-3">{lastSync.summary}</pre>
         </details>
       )}

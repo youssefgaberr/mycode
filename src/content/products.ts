@@ -4,18 +4,25 @@ import type { CategorySlug } from "@/config/store";
  * ─────────────────────────────────────────────────────────────────────────────
  *  PRODUCT CONTENT — our own titles and descriptions.
  * ─────────────────────────────────────────────────────────────────────────────
- *  `npm run import` searches CJdropshipping for each entry below, picks the
- *  best match and stores it with THIS copy. Supplier text is never shown to
- *  customers. Facts that vary by listing (size, capacity, materials) come from
- *  CJ's structured data and appear in the specifications table instead.
+ *  `npm run import` (or "Import products from CJ" in /admin/products) loads
+ *  each entry below from CJdropshipping and stores it with THIS copy. Supplier
+ *  text is never shown to customers. Facts that vary by listing (size,
+ *  materials, options) come from CJ's structured data and appear in the
+ *  specifications table instead.
+ *
+ *  Each entry is pinned to the exact CJ listing (`cjProductId`) chosen after
+ *  checking CJ's catalogue, so imports always fetch that product. The copy is
+ *  written to match those listings. If you change a `cjProductId`, re-check
+ *  the copy against the new item.
  *
  *  Writing rules: plain UK English; describe what the product does; no health,
- *  safety, "non-toxic", "BPA-free" or "dishwasher-safe" claims unless you
- *  have confirmed them for the exact product you are selling.
+ *  safety, "non-toxic", "BPA-free" or "dishwasher-safe" claims, and no specs
+ *  (capacity, battery, charging) unless you've confirmed them for the exact
+ *  product you are selling.
  *
  *  To add a product: copy an entry, give it a new `key`, write the copy, set
- *  the search terms and match rules, then run `npm run import`. If you already
- *  know the exact CJ product, set `cjProductId` and the search is skipped.
+ *  `cjProductId` (find it with "Search CJ" in /admin/sourcing) or the search
+ *  terms and match rules, then import.
  */
 
 export interface ProductContent {
@@ -43,26 +50,30 @@ export interface ProductContent {
 export const productContent: ProductContent[] = [
   {
     key: "air-fryer-liners",
+    // CJ: "Air Fryer Silicone Pot Replacement Of Parchment Paper Liners…"
+    cjProductId: "1435061247828692992",
     category: "cooking",
     searchTerms: ["silicone air fryer liner", "air fryer silicone pot"],
     match: {
       all: [["air fryer", "airfryer", "air-fryer"], ["silicone"], ["liner", "pot", "basket", "mat", "tray", "pad", "bowl"]],
-      none: ["paper", "disposable", "parchment", "oil sprayer", "brush"],
+      none: ["disposable", "oil sprayer", "brush"],
       prefer: ["reusable", "liner", "foldable"],
     },
     title: "Reusable Silicone Air Fryer Liner",
-    summary: "A flexible liner that sits in your air fryer basket and catches the mess.",
+    summary: "A silicone pot that sits in your air fryer basket and catches the mess.",
     description:
-      "Pop this liner into your air fryer basket before you cook and the crumbs, grease and sauce end up in the liner rather than the basket. When you're done, lift it out, give it a wash and it's ready for next time.\n\nThe raised sides help keep juices in place and the handles make it easy to lift out once it has cooled. Because it's reusable, there's no need to keep buying paper liners.\n\nCheck the size in the specifications below against your air fryer basket before ordering.",
+      "Pop this silicone pot into your air fryer basket before you cook and the crumbs, grease and sauce end up in the liner rather than the basket. When you're done, lift it out, give it a wash and it's ready for next time.\n\nIts raised sides help keep juices in place, and because it's reusable there's no need to keep buying paper liners.\n\nThere are several sizes and colours — check the options and the size in the specifications against your air fryer basket before ordering.",
     bullets: [
       "Keeps your air fryer basket cleaner",
       "Reusable — wash and use again",
-      "Raised edges hold in juices and sauces",
-      "Folds or squashes down for storage",
+      "Raised sides hold in juices and sauces",
+      "Choice of sizes and colours",
     ],
   },
   {
     key: "usb-food-chopper",
+    // CJ: "Multifunctional Household Slice Electric Garlic Pounding Chopper"
+    cjProductId: "1716721556694511616",
     category: "prep",
     searchTerms: ["electric garlic chopper usb", "mini electric food chopper", "wireless food chopper"],
     match: {
@@ -70,30 +81,32 @@ export const productContent: ProductContent[] = [
       none: ["manual", "hand pull", "pull rope", "meat grinder", "coffee", "juicer"],
       prefer: ["mini", "garlic", "usb", "wireless"],
     },
-    title: "Cordless Mini Food Chopper",
-    summary: "A small rechargeable chopper for garlic, onion, herbs and nuts.",
+    title: "Electric Mini Garlic & Food Chopper",
+    summary: "A compact electric chopper for garlic, onion, herbs and nuts.",
     description:
-      "Skip the chopping board for the small jobs. Drop in a few garlic cloves, a shallot or a handful of herbs, press the button and the blades do the work in seconds.\n\nIt charges by USB, so there's no cable trailing across the worktop while you use it, and it's compact enough to live in a drawer. The bowl comes apart for washing.\n\nIdeal for small quantities: sauces, marinades, salsas and baby portions. See the specifications for the bowl size.",
+      "Skip the chopping board for the small jobs. Drop in a few garlic cloves, a shallot or a handful of herbs, press the button and the blades do the work in seconds.\n\nIt's compact enough to live in a drawer, and the bowl comes apart for washing.\n\nIdeal for small quantities: sauces, marinades, salsas and dressings. See the options and specifications for sizes and power details.",
     bullets: [
-      "USB rechargeable — no cable while you chop",
-      "Handles garlic, onion, herbs, chilli and nuts",
+      "Chops garlic, onion, herbs, chilli and nuts in seconds",
+      "One-touch electric operation",
       "Compact enough for a kitchen drawer",
       "Bowl and blades come apart for cleaning",
     ],
   },
   {
     key: "milk-frother",
+    // CJ: "Modern Minimalist Handheld Electric Milk Powder Stirrer"
+    cjProductId: "2408020406281627600",
     category: "drinks",
     searchTerms: ["handheld milk frother", "electric milk frother whisk"],
     match: {
-      all: [["frother", "foamer", "froth", "milk whisk"]],
-      none: ["pitcher", "jug", "machine", "steam", "cup", "stainless steel pot"],
+      all: [["frother", "foamer", "froth", "milk whisk", "stirrer"]],
+      none: ["pitcher", "jug", "machine", "steam", "heater", "stainless steel pot"],
       prefer: ["handheld", "electric", "rechargeable", "usb", "whisk"],
     },
     title: "Handheld Milk Frother",
     summary: "Whip up foamy milk for lattes, cappuccinos and hot chocolate.",
     description:
-      "Turn a mug of warm milk into a café-style topping in a few seconds. Hold the whisk just under the surface, switch on and move it gently until the foam builds up.\n\nIt's just as handy for whisking matcha, protein shakes, instant coffee or a single egg. Rinse the whisk under the tap afterwards and it's clean.\n\nSmall and light, it fits in a cup or a drawer.",
+      "Turn a mug of warm milk into a café-style topping in a few seconds. Hold the whisk just under the surface, switch on and move it gently until the foam builds up.\n\nIt's just as handy for mixing matcha, hot chocolate, protein shakes or instant coffee. Rinse the whisk under the tap afterwards and it's clean.\n\nSlim and light, it fits in a cup or a drawer.",
     bullets: [
       "Froths milk for lattes, cappuccinos and hot chocolate",
       "Also mixes matcha, shakes and instant drinks",
@@ -103,26 +116,30 @@ export const productContent: ProductContent[] = [
   },
   {
     key: "fridge-organiser-bins",
+    // CJ: "8 Grids Divided Serving Tray … Refrigerator Organizer"
+    cjProductId: "1798298899103485952",
     category: "storage",
-    searchTerms: ["fridge organizer bin", "refrigerator storage box stackable", "fridge storage container"],
+    searchTerms: ["fridge organizer box divided", "refrigerator storage box"],
     match: {
-      all: [["fridge", "refrigerator"], ["organizer", "organiser", "storage box", "bin", "container", "drawer", "basket", "storage rack"]],
-      none: ["magnet", "sticker", "deodor", "thermometer", "egg", "freezer bag", "filter"],
-      prefer: ["stackable", "clear", "transparent", "drawer", "handle"],
+      all: [["fridge", "refrigerator"], ["organizer", "organiser", "storage box", "bin", "container", "drawer", "basket"]],
+      none: ["magnet", "sticker", "deodor", "thermometer", "freezer bag", "filter"],
+      prefer: ["divided", "grid", "compartment", "clear", "lid"],
     },
-    title: "Clear Fridge Organiser Bins",
-    summary: "Stackable clear bins that keep your fridge shelves tidy.",
+    title: "Divided Fridge & Snack Organiser",
+    summary: "One box, eight compartments — keep fruit, snacks and sauces sorted.",
     description:
-      "Group your yoghurts, sauces, cheeses and snacks into clear bins and you'll always see what you've got. Slide a bin out and everything comes with it, so nothing gets lost at the back of the shelf.\n\nThey also work well in kitchen cupboards, the pantry or the bathroom.\n\nPlease check the dimensions in the specifications below against your fridge shelves.",
+      "Give small foods a home. This organiser box is split into eight compartments, so berries, cheese, olives, dips and snacks each have their own space instead of rolling around the fridge shelf.\n\nIt's just as useful as a serving tray for picnics and snack boards, or for keeping seasonings and baking bits tidy in a cupboard.\n\nPlease check the dimensions in the specifications below against your fridge shelves.",
     bullets: [
-      "See what's inside at a glance",
-      "Slide out to reach the back of the shelf",
-      "Helps group foods and use them up",
+      "Eight separate compartments",
+      "Keeps fruit, snacks and sauces sorted",
+      "Doubles as a snack or serving tray",
       "Also handy in cupboards and the pantry",
     ],
   },
   {
     key: "oil-spray-bottle",
+    // CJ: "2 In 1 Oil Sprayer Bottle BBQ Cooking Oil Dispenser Olive Oil Pourers Sprayer…"
+    cjProductId: "1715574082122551296",
     category: "cooking",
     searchTerms: ["2 in 1 oil sprayer bottle", "oil spray dispenser kitchen", "olive oil sprayer"],
     match: {
@@ -143,62 +160,69 @@ export const productContent: ProductContent[] = [
   },
   {
     key: "herb-scissors",
+    // CJ: "Kitchen Multi-function Bottle Opener Kitchen Auxiliary Scissors"
+    // (CJ had no multi-blade herb scissors when this was chosen.)
+    cjProductId: "1761573015550169088",
     category: "prep",
-    searchTerms: ["herb scissors 5 blade", "multi blade kitchen scissors", "scallion scissors"],
+    searchTerms: ["kitchen scissors multifunction", "herb scissors"],
     match: {
       all: [["scissor", "shear"]],
       none: ["hair", "nail", "pet", "pruning", "garden", "fabric", "tailor", "barber", "thinning"],
-      prefer: ["herb", "blade", "layer", "multi", "scallion", "onion", "shredded"],
+      prefer: ["kitchen", "herb", "multi", "bottle opener"],
     },
-    title: "Multi-Blade Herb Scissors",
-    summary: "Snip fresh herbs straight into the pan with several blades at once.",
+    title: "Multi-Function Kitchen Scissors",
+    summary: "Everyday kitchen scissors with a built-in bottle opener.",
     description:
-      "Several blades side by side mean one snip does the work of several. Cut chives, parsley, coriander, basil or spring onions straight over the pan or plate — no chopping board to wash.\n\nMany sets come with a cleaning comb for clearing bits from between the blades; see the listing details for what's included.\n\nPlease handle with care: the blades are sharp.",
+      "A sturdy pair of kitchen scissors for the jobs a knife makes fiddly: snipping herbs and spring onions, trimming bacon, opening food packets and cutting string.\n\nThe built-in bottle opener saves hunting for one in the drawer.\n\nPlease handle with care: the blades are sharp. See the photos and specifications for the exact design you'll receive.",
     bullets: [
-      "Several blades for fast, fine snipping",
-      "Cut herbs straight over the pan or plate",
-      "Great for chives, spring onions and coriander",
-      "Less washing up than a knife and board",
+      "Snip herbs, spring onions and packaging",
+      "Built-in bottle opener",
+      "Handy alternative to a knife and board",
+      "Lives happily in a kitchen drawer",
     ],
   },
   {
     key: "silicone-baking-mat",
+    // CJ: "Non-Stick Silicone Pyramid Cooking Mat Baking Mat With Grid…"
+    cjProductId: "ECAC663E-87ED-4D84-B320-A8E7FD76AE41",
     category: "baking",
-    searchTerms: ["silicone baking mat", "non stick silicone baking sheet", "macaron silicone mat"],
+    searchTerms: ["silicone baking mat", "silicone pyramid baking mat"],
     match: {
-      all: [["silicone"], ["baking", "bake", "pastry", "macaron", "oven", "cookie"], ["mat", "sheet", "liner", "pad"]],
-      none: ["air fryer", "glove", "cup", "mould", "mold", "trivet", "brush", "spatula"],
+      all: [["silicone"], ["baking", "bake", "pastry", "oven", "cooking"], ["mat", "sheet", "liner", "pad"]],
+      none: ["air fryer", "glove", "cup", "mould", "mold", "trivet", "brush", "spatula", "pet", "dog", "cat"],
       prefer: ["baking mat", "reusable", "non stick", "non-stick"],
     },
-    title: "Reusable Silicone Baking Mat",
-    summary: "Swap baking paper for a mat you can wash and use again.",
+    title: "Silicone Pyramid Roasting & Baking Mat",
+    summary: "A reusable mat with a raised surface for roasting and baking.",
     description:
-      "Lay this mat on your baking tray instead of baking paper or greasing. Biscuits, roasted veg and pastries lift off easily, and the tray stays cleaner.\n\nSome mats have measurement guides printed on them, which help when rolling out dough or piping macarons evenly — see the photos for the version you'll receive.\n\nWash, dry and roll it up for storage. Check the size in the specifications against your trays.",
+      "Lay this mat on your baking tray and cook on top of it. The raised pyramid surface lets air circulate under your food and lets fat run away from it, so oven chips, wings, bacon and roasted veg crisp up nicely.\n\nIt's a reusable alternative to baking paper and foil — wash, dry and roll it up for storage.\n\nThere's a choice of sizes and colours; check the size in the specifications against your trays.",
     bullets: [
-      "Replaces baking paper — wash and reuse",
-      "Food lifts off easily",
-      "Helps keep baking trays clean",
+      "Raised pyramid surface lets fat drain away",
+      "Reusable alternative to baking paper and foil",
+      "Choice of sizes and colours",
       "Rolls up for storage",
     ],
   },
   {
     key: "vegetable-spiralizer",
+    // CJ: "Vegetable Grater Potato Spiral Slicer Whirlwind Fruit Vegetable Spiral Machine…"
+    cjProductId: "2409131134451623700",
     category: "prep",
-    searchTerms: ["handheld vegetable spiralizer", "spiral slicer vegetable", "vegetable spiralizer"],
+    searchTerms: ["vegetable spiralizer", "spiral slicer vegetable"],
     match: {
       all: [["spiral", "spiraliz", "spiralis"]],
       none: ["potato tower", "hair", "electric drill", "notebook"],
-      prefer: ["handheld", "vegetable", "zucchini", "courgette"],
+      prefer: ["vegetable", "slicer", "zucchini", "courgette"],
     },
-    title: "Handheld Vegetable Spiralizer",
-    summary: "Turn courgettes, carrots and cucumbers into ribbons and spirals.",
+    title: "Vegetable Spiral Slicer",
+    summary: "Turn potatoes, courgettes and carrots into spirals and ribbons.",
     description:
-      "Twist a courgette, carrot or cucumber through the spiralizer and it comes out in long ribbons — perfect for courgetti, colourful salads or garnishes.\n\nIt's compact and needs no power, so it fits in a drawer. Use the food holder supplied (where included) to protect your fingers, and take care with the blades when cleaning.",
+      "Turn everyday veg into something more fun. Feed a potato, courgette, carrot or cucumber through the spiral slicer and it comes out in long spirals and ribbons — perfect for spiral fries, courgetti, colourful salads and garnishes.\n\nSee the photos for how it works, use the food holder where supplied to keep fingers clear, and take care with the blades when cleaning.",
     bullets: [
-      "Makes courgetti and vegetable ribbons",
-      "Works with courgettes, carrots, cucumbers and more",
-      "Compact, no power needed",
-      "Fits in a kitchen drawer",
+      "Makes spiral fries, courgetti and veg ribbons",
+      "Works with potatoes, courgettes, carrots and more",
+      "Fun way to get more veg on the plate",
+      "Take care: blades are sharp",
     ],
   },
 ];

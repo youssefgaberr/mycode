@@ -27,7 +27,7 @@ export function Gallery({ title, images, videos }: { title: string; images: stri
   };
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="relative aspect-square overflow-hidden rounded-2xl border border-border bg-surface-2">
         {current.kind === "image" ? (
           <ProductImage

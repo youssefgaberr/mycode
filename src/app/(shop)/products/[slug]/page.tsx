@@ -72,7 +72,7 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[slug]">, "p
         </ol>
       </nav>
 
-      <div className="mt-4 grid gap-8 lg:grid-cols-2 lg:gap-12">
+      <div className="mt-4 grid grid-cols-1 gap-8 lg:grid-cols-2 lg:gap-12">
         <Gallery title={product.title} images={product.images} videos={product.videos} />
 
         <div className="space-y-6">
@@ -108,7 +108,7 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[slug]">, "p
         </div>
       </div>
 
-      <div className="mt-12 grid gap-10 lg:grid-cols-[2fr_1fr]">
+      <div className="mt-12 grid grid-cols-1 gap-10 lg:grid-cols-[2fr_1fr]">
         <section aria-labelledby="about">
           <h2 id="about" className="text-xl font-bold">
             About this product

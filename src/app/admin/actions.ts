@@ -152,12 +152,23 @@ export async function useForCoreProduct(formData: FormData) {
       update: { value: candidate.cjProductId },
     });
     await db.sourcingCandidate.update({ where: { id }, data: { status: "PUBLISHED", productId: product.id } });
+    if (candidate.source === "trending") await db.product.update({ where: { id: product.id }, data: { isTrending: true } });
     msg = `“${product.title}” now uses this CJ listing (${product.isAddOn ? "add-on" : "main product"}, ${formatGBP(product.pricePence)}).`;
   } catch (err) {
     msg = `Couldn't use this listing: ${(err as Error).message}`;
   }
   updateTag("products");
   back("/admin/sourcing", msg);
+}
+
+/** Show or remove the "HOT" badge / Trending strip for a product. */
+export async function setTrending(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const isTrending = formData.get("trending") === "true";
+  await db.product.update({ where: { id }, data: { isTrending } });
+  updateTag("products");
+  back("/admin/products", isTrending ? "Marked as trending (HOT badge shown)." : "Removed from trending.");
 }
 
 export async function setPublished(formData: FormData) {
@@ -307,6 +318,7 @@ export async function publishCandidate(formData: FormData) {
       videos,
     });
     await db.sourcingCandidate.update({ where: { id: f.id }, data: { status: "PUBLISHED", productId: product.id } });
+    if (candidate.source === "trending") await db.product.update({ where: { id: product.id }, data: { isTrending: true } });
     msg = `Published “${product.title}”${product.isAddOn ? " (as an add-on — profit below threshold)" : ""}.`;
   } catch (err) {
     msg = `Publish failed: ${(err as Error).message}`;

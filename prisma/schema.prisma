@@ -40,6 +40,8 @@ model Product {
   shippingCostPence Int
   estProfitPence  Int
   isAddOn         Boolean @default(false)
+  /// Shows a "HOT" badge and the Trending strip: set when published from CJ's trending list, or by you in /admin/products
+  isTrending      Boolean @default(false)
   warehouseCountry String
   logisticName    String?
   deliveryMinDays Int?

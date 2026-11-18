@@ -24,7 +24,7 @@ async function LoginForm({ searchParams }: Pick<PageProps<"/admin/login">, "sear
           className="h-12 w-full rounded-lg border border-border bg-bg px-3"
         />
       </div>
-      <button className="h-12 w-full rounded-full bg-brand font-bold text-brand-fg hover:bg-brand-hover">Log in</button>
+      <button className="h-12 w-full rounded-xl bg-brand font-bold text-brand-fg hover:bg-brand-hover">Log in</button>
     </form>
   );
 }

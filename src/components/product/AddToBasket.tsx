@@ -93,7 +93,7 @@ export function AddToBasket({ product }: { product: ProductPageData }) {
           ref={mainButton}
           type="button"
           onClick={addToBasket}
-          className="h-12 flex-1 rounded-full bg-brand px-6 font-bold text-brand-fg shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-hover active:translate-y-0"
+          className="h-12 flex-1 rounded-xl bg-brand px-6 font-bold text-brand-fg shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-hover active:translate-y-0"
         >
           Add to basket
         </button>

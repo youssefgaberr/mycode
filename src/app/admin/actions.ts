@@ -108,7 +108,7 @@ export async function discoverTrending() {
   if (!cjConfigured()) back("/admin/sourcing", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
   const msg = await withRunLog(
     "discover",
-    (log) => discoverProducts({ limit: 12, log }),
+    (log) => discoverProducts({ limit: 10, log }),
     (r) => `Searched CJ: ${r.eligible} eligible products found, ${r.saved} added to the sourcing database with photos, videos and costs.`,
   );
   back("/admin/sourcing", msg);

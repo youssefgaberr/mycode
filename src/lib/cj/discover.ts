@@ -29,12 +29,15 @@ export const DISCOVERY_KEYWORDS = [
   "egg tools",
 ];
 
+/** Supplier cost ceiling (USD) for discovery: we sell gadgets, not furniture. */
+const MAX_GADGET_COST_USD = 60;
+
 /** Must look like a home/kitchen product… */
 const KITCHEN_WORDS = [
-  "kitchen", "cook", "bak", "fryer", "coffee", "tea", "milk", "food", "fruit", "vegetable", "veggie",
-  "fridge", "refrigerator", "spice", "oil", "garlic", "egg", "pan", "pot", "lunch", "storage",
-  "organizer", "organiser", "drawer", "dish", "sink", "cutting", "peeler", "grater", "slicer",
-  "whisk", "spatula", "silicone", "jar", "container", "bottle", "cup", "mug", "kettle", "chopper",
+  "kitchen", "cook", "bak", "fryer", "coffee", "tea ", "teapot", "milk", "food", "fruit", "vegetable", "veggie",
+  "fridge", "refrigerator", "spice", "garlic", "egg", "frying pan", "wok", "saucepan", "lunch", "dish", "sink",
+  "cutting board", "chopping", "peeler", "grater", "slicer", "whisk", "spatula", "kettle", "chopper", "utensil",
+  "spoon", "ladle", "colander", "strainer", "oil spray", "oil sprayer", "seasoning",
 ];
 
 /**
@@ -43,9 +46,14 @@ const KITCHEN_WORDS = [
  * vapes, medical or baby/child products (extra safety rules), weapons.
  */
 const EXCLUDED_WORDS = [
-  "knife", "knives", "cleaver", "machete", "dagger", "blade set", "lighter", "butane", "gas torch",
+  "knife", "knives", "cleaver", "machete", "dagger", "blade set", "blade", "scimitar", "boning",
+  "butcher", "slaughter", "axe", "sword", "pet ", "pets", "dog", "cat ", "cats", "aromatherapy", "essential oil",
+  "candle", "humidifier", "diffuser", "plant", "garden", "grow bag", "sewer", "drain", "pipe", "hair", "lighter", "butane", "gas torch",
   "vape", "e-cigarette", "cigarette", "medical", "baby", "infant", "toddler", "kids", "children",
   "toy", "weapon", "self defense", "adult", "sexy", "cbd", "pesticide",
+  // Furniture and large items: not gadgets, and costly to return.
+  "bed", "sofa", "couch", "mattress", "tv stand", "tv cabinet", "cabinet", "sideboard", "wardrobe",
+  "coffee table", "side table", "dining table", "desk", "chair", "bench", "stool", "shelving unit", "bookcase",
 ];
 
 export function isEligible(name: string): boolean {
@@ -74,6 +82,8 @@ export async function discoverProducts(opts: { limit?: number; log?: (s: string)
   const found = new Map<string, Found>();
   const consider = (p: CjListProduct, source: string, keyword: string, bonus: number) => {
     if (!p.id || known.has(p.id) || !isEligible(p.nameEn ?? "")) return;
+    // Gadgets, not big-ticket items.
+    if (num(p.sellPrice) > MAX_GADGET_COST_USD) return;
     const score = bonus + Math.log10(num(p.listedNum) + 1) * 10 + Math.min(Math.log10(num(p.warehouseInventoryNum) + 1), 4) * 2 + (num(p.isVideo) ? 5 : 0);
     const prev = found.get(p.id);
     if (!prev || prev.score < score) found.set(p.id, { p, score, source, keyword });
@@ -92,6 +102,14 @@ export async function discoverProducts(opts: { limit?: number; log?: (s: string)
       } catch (err) {
         log(`  "${keyword}" (${country}) failed: ${(err as Error).message}`);
       }
+    }
+    // UK/EU stock for gadgets is often thin, so also take CJ's trending list
+    // from any warehouse (usually China, ~1–2 weeks). Ranked below UK/EU stock.
+    try {
+      const anywhere = await cj.searchProducts({ keyWord: keyword, productFlag: 0, size: 20 });
+      anywhere.forEach((p) => consider(p, "trending", keyword, 10));
+    } catch (err) {
+      log(`  "${keyword}" (any warehouse) failed: ${(err as Error).message}`);
     }
     log(`  searched "${keyword}" — ${found.size} candidates so far`);
   }

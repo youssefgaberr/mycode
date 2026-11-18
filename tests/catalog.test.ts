@@ -112,3 +112,23 @@ describe("keywordRelevance", () => {
     expect(keywordRelevance("herb scissors", "5 Blade Herb Scissors Kitchen")).toBe(1);
   });
 });
+
+describe("discovery eligibility", () => {
+  it("keeps kitchen gadgets and drops furniture", async () => {
+    const { isEligible } = await import("@/lib/cj/discover");
+    expect(isEligible("Electric Coffee Grinder Grinding Milling Nut Bean Spice")).toBe(true);
+    expect(isEligible("TV Stand Cabinet High Gloss With 3 Drawers, 3 Open Storage")).toBe(false);
+    expect(isEligible("Upholstered Double Bed With Hydraulic Storage")).toBe(false);
+  });
+});
+
+describe("discovery safety filter", () => {
+  it("never lets blades, pet or garden items through", async () => {
+    const { isEligible } = await import("@/lib/cj/discover");
+    expect(isEligible("Slaughter Cutting Meat Boning Small Scimitar Special Skinning Butcher Kitchen")).toBe(false);
+    expect(isEligible("Silicone Dog Bath Massage Gloves Brush Pet Cat Bathroom")).toBe(false);
+    expect(isEligible("Breathable Potato Tomato Vegetable Plant Growth Bag")).toBe(false);
+    expect(isEligible("Iron Pan Traditional Iron Wok Handmade")).toBe(true);
+    expect(isEligible("Multifunctional Slotted Spoon Grinding Cooking Spoon Garlic")).toBe(true);
+  });
+});

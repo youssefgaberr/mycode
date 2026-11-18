@@ -1,103 +1,104 @@
 import Link from "next/link";
 import { store } from "@/config/store";
-import { getMainProducts } from "@/lib/catalog";
+import { getMainProducts, getTrendingProducts } from "@/lib/catalog";
 import { formatGBPShort, toPence } from "@/lib/pricing";
-import { ProductGrid } from "@/components/product/ProductCard";
-import { ProductImage } from "@/components/product/ProductImage";
+import { ProductCard, ProductGrid } from "@/components/product/ProductCard";
 import { LockIcon, ReturnIcon, TagIcon, TruckIcon } from "@/components/icons";
 import { categoryIcons, categoryTints } from "@/components/category-icons";
+import { Faq } from "@/components/home/Faq";
 
 export default async function HomePage() {
-  const products = await getMainProducts();
+  const [products, { trending, products: strip }] = await Promise.all([getMainProducts(), getTrendingProducts()]);
   const b = store.basket;
-  const collage = products.filter((p) => p.image).slice(0, 3);
-  const perks = [
-    { icon: TruckIcon, title: `Free delivery from ${formatGBPShort(toPence(b.freeDeliveryThreshold))}`, text: `Otherwise ${formatGBPShort(toPence(b.deliveryFee))} to anywhere in the UK` },
-    { icon: TagIcon, title: `${b.multiBuyPercentOff}% off ${b.multiBuyMinItems}+ items`, text: "Applied automatically in your basket" },
-    { icon: ReturnIcon, title: "14-day returns", text: "Changed your mind? Send it back" },
-    { icon: LockIcon, title: "Secure checkout", text: "Pay safely with Stripe" },
+  const highlights = [
+    { big: formatGBPShort(toPence(b.freeDeliveryThreshold)), small: "free UK delivery from", icon: TruckIcon },
+    { big: `${b.multiBuyPercentOff}%`, small: `off when you buy ${b.multiBuyMinItems}+`, icon: TagIcon },
+    { big: "14 days", small: "to change your mind", icon: ReturnIcon },
+    { big: "Stripe", small: "secure checkout", icon: LockIcon },
   ];
 
   return (
     <>
       {/* Hero */}
       <section className="grain relative overflow-hidden border-b border-border">
-        <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 py-12 sm:py-16 lg:grid-cols-[1.1fr_1fr] lg:py-20">
-          <div className="animate-fade-up">
-            <p className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-3 py-1 text-xs font-semibold uppercase tracking-wider text-sage">
-              <span className="size-1.5 rounded-full bg-sage" /> Home &amp; kitchen gadgets
-            </p>
-            <h1 className="font-display mt-5 text-[2.6rem] font-semibold leading-[1.05] sm:text-6xl">
-              Little helpers for a <em className="text-brand not-italic sm:italic">happier</em> kitchen.
-            </h1>
-            <p className="mt-5 max-w-lg text-lg leading-relaxed text-muted">{store.description}</p>
-            <div className="mt-8 flex flex-wrap gap-3">
-              <Link
-                href="/shop"
-                className="inline-flex h-12 items-center rounded-full bg-brand px-7 font-bold text-brand-fg shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-hover"
-              >
-                Shop the gadgets
-              </Link>
-              <Link
-                href="#categories"
-                className="inline-flex h-12 items-center rounded-full border border-border bg-surface px-7 font-semibold transition hover:border-brand"
-              >
-                Browse categories
-              </Link>
-            </div>
+        <div className="mx-auto max-w-4xl px-4 pb-14 pt-14 text-center sm:pb-20 sm:pt-20">
+          <p className="inline-flex animate-fade-up items-center gap-2 rounded-full border border-border bg-surface px-3 py-1 text-xs font-semibold text-muted shadow-soft">
+            <span className="rounded-full bg-danger px-1.5 py-px text-[10px] font-extrabold uppercase text-white">New</span>
+            Clever gadgets for UK kitchens
+          </p>
+          <h1 className="font-display mt-6 animate-fade-up text-[2.5rem] font-extrabold leading-[1.08] sm:text-6xl">
+            Kitchen gadgets that
+            <br />
+            <span className="text-brand">make cooking easier</span>
+          </h1>
+          <p className="mx-auto mt-5 max-w-xl animate-fade-up text-lg leading-relaxed text-muted">
+            Smart, affordable tools for everyday cooking, prep and storage — delivered to your door.
+          </p>
+          <div className="mt-8 flex animate-fade-up flex-wrap justify-center gap-3">
+            <Link
+              href="/shop"
+              className="inline-flex h-12 items-center gap-2 rounded-xl bg-brand px-7 font-semibold text-brand-fg shadow-soft transition hover:-translate-y-0.5 hover:bg-brand-hover"
+            >
+              Shop all gadgets <span aria-hidden>→</span>
+            </Link>
+            <Link
+              href="#trending"
+              className="inline-flex h-12 items-center rounded-xl border border-border bg-surface px-7 font-semibold transition hover:border-brand"
+            >
+              {trending ? "See what's trending" : "See what's new"}
+            </Link>
           </div>
-
-          {collage.length > 0 && (
-            <div className="relative mx-auto h-72 w-full max-w-md sm:h-96" aria-hidden>
-              <div className="absolute -right-6 -top-6 size-56 rounded-full bg-honey/30 blur-3xl" />
-              <div className="absolute -bottom-8 left-0 size-48 rounded-full bg-brand/20 blur-3xl" />
-              {collage.map((p, i) => {
-                const pos = [
-                  "left-0 top-6 w-[58%] -rotate-3 z-10",
-                  "right-0 top-0 w-[48%] rotate-3",
-                  "right-6 bottom-0 w-[50%] -rotate-1 z-20",
-                ][i];
-                return (
-                  <div
-                    key={p.id}
-                    className={`absolute ${pos} aspect-square overflow-hidden rounded-3xl border-4 border-surface shadow-lift animate-fade-up`}
-                    style={{ animationDelay: `${150 + i * 120}ms` }}
-                  >
-                    <ProductImage src={p.image} alt="" sizes="(min-width: 1024px) 260px, 50vw" priority={i === 0} />
-                  </div>
-                );
-              })}
-              <div className="absolute bottom-4 left-2 z-30 rounded-2xl border border-border bg-surface px-4 py-3 shadow-lift">
-                <p className="text-xs text-muted">From</p>
-                <p className="font-display text-xl font-semibold">
-                  {formatGBPShort(Math.min(...products.map((p) => p.pricePence)))}
-                </p>
-              </div>
-            </div>
-          )}
+          <p className="mt-4 text-xs text-muted">
+            Free UK delivery from {formatGBPShort(toPence(b.freeDeliveryThreshold))} · 14-day returns · Prices include VAT
+          </p>
         </div>
       </section>
 
-      {/* Perks */}
-      <section aria-label="Why shop with us" className="border-b border-border bg-surface">
-        <ul className="mx-auto grid max-w-6xl grid-cols-1 gap-4 px-4 py-6 sm:grid-cols-2 lg:grid-cols-4">
-          {perks.map(({ icon: Icon, title, text }) => (
-            <li key={title} className="flex items-center gap-3">
-              <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-                <Icon className="size-5" />
-              </span>
-              <span>
-                <span className="block text-sm font-semibold">{title}</span>
-                <span className="block text-xs text-muted">{text}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+      {/* Trending / new strip */}
+      {strip.length > 0 && (
+        <section id="trending" aria-labelledby="trending-heading" className="mx-auto max-w-6xl scroll-mt-20 px-4 pt-12">
+          <div className="flex items-end justify-between gap-4">
+            <h2 id="trending-heading" className="font-display flex items-center gap-2 text-2xl font-bold sm:text-3xl">
+              {trending ? (
+                <>
+                  <span aria-hidden>🔥</span> Trending this week
+                </>
+              ) : (
+                <>
+                  <span aria-hidden>✨</span> New in
+                </>
+              )}
+            </h2>
+            <Link href="/shop" className="shrink-0 text-sm font-semibold text-brand hover:underline">
+              View all →
+            </Link>
+          </div>
+          <ul className="-mx-4 mt-5 flex snap-x gap-3 overflow-x-auto px-4 pb-2 sm:mx-0 sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:px-0">
+            {strip.slice(0, 4).map((p, i) => (
+              <li key={p.id} className="w-[46%] shrink-0 snap-start sm:w-auto">
+                <ProductCard product={p} priority={i < 2} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* Payments strip */}
+      <section aria-label="Payment options" className="mx-auto max-w-6xl px-4 pt-10">
+        <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 rounded-2xl border border-border bg-surface-2 px-4 py-4 text-sm font-semibold text-muted">
+          <span className="flex items-center gap-2 text-fg">
+            <LockIcon className="size-4" /> Secure checkout by Stripe
+          </span>
+          <span>Visa</span>
+          <span>Mastercard</span>
+          <span>American Express</span>
+        </div>
       </section>
 
       {/* Categories */}
       <section id="categories" aria-labelledby="cat-heading" className="mx-auto max-w-6xl scroll-mt-20 px-4 pt-14">
-        <h2 id="cat-heading" className="font-display text-3xl font-semibold">
+        <p className="text-xs font-bold uppercase tracking-widest text-brand">Categories</p>
+        <h2 id="cat-heading" className="font-display mt-1 text-2xl font-bold sm:text-3xl">
           Shop by category
         </h2>
         <ul className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
@@ -107,12 +108,12 @@ export default async function HomePage() {
               <li key={c.slug}>
                 <Link
                   href={`/shop/${c.slug}`}
-                  className="group flex h-full flex-col items-start gap-6 rounded-3xl border border-border bg-surface p-5 transition hover:-translate-y-1 hover:shadow-lift"
+                  className="group flex h-full flex-col items-start gap-5 rounded-2xl border border-border bg-surface p-5 transition hover:-translate-y-1 hover:border-brand/40 hover:shadow-lift"
                 >
-                  <span className={`flex size-14 items-center justify-center rounded-2xl ${categoryTints[c.slug] ?? "bg-surface-2"}`}>
-                    {Icon && <Icon className="size-8" />}
+                  <span className={`flex size-12 items-center justify-center rounded-xl ${categoryTints[c.slug] ?? "bg-surface-2"}`}>
+                    {Icon && <Icon className="size-7" />}
                   </span>
-                  <span className="flex w-full items-center justify-between font-semibold">
+                  <span className="flex w-full items-center justify-between text-sm font-semibold">
                     {c.name}
                     <span aria-hidden className="text-muted transition group-hover:translate-x-1 group-hover:text-brand">
                       →
@@ -125,35 +126,53 @@ export default async function HomePage() {
         </ul>
       </section>
 
-      {/* Products */}
-      <section className="mx-auto max-w-6xl space-y-6 px-4 py-14" aria-labelledby="popular">
+      {/* Highlights band */}
+      <section aria-label="Why shop with us" className="mx-auto max-w-6xl px-4 pt-14">
+        <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {highlights.map(({ big, small, icon: Icon }) => (
+            <li key={small} className="rounded-2xl border border-border bg-surface p-5 text-center">
+              <Icon className="mx-auto size-6 text-brand" />
+              <p className="font-display mt-2 text-2xl font-extrabold sm:text-3xl">{big}</p>
+              <p className="mt-1 text-sm text-muted">{small}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+
+      {/* All products */}
+      <section className="mx-auto max-w-6xl space-y-6 px-4 pt-14" aria-labelledby="all">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <h2 id="popular" className="font-display text-3xl font-semibold">
-              Our gadgets
+            <p className="text-xs font-bold uppercase tracking-widest text-brand">Shop</p>
+            <h2 id="all" className="font-display mt-1 text-2xl font-bold sm:text-3xl">
+              All gadgets
             </h2>
-            <p className="mt-1 text-muted">Everyday tools, chosen to earn their place in your drawer.</p>
           </div>
           <Link href="/shop" className="shrink-0 text-sm font-semibold text-brand hover:underline">
-            View all →
+            Browse the shop →
           </Link>
         </div>
         <ProductGrid products={products} />
       </section>
 
-      {/* Multi-buy band */}
-      <section className="mx-auto max-w-6xl px-4 pb-6">
-        <div className="grain relative overflow-hidden rounded-3xl border border-border bg-surface-2 px-6 py-10 text-center sm:px-12">
-          <p className="font-display text-3xl font-semibold sm:text-4xl">
-            Buy {b.multiBuyMinItems}, save {b.multiBuyPercentOff}%.
+      <Faq />
+
+      {/* Dark CTA band */}
+      <section className="mx-auto max-w-6xl px-4 pb-4">
+        <div className="relative overflow-hidden rounded-3xl bg-ink px-6 py-12 text-center text-white sm:px-12">
+          <div aria-hidden className="absolute -left-20 -top-20 size-64 rounded-full bg-brand/30 blur-3xl" />
+          <div aria-hidden className="absolute -bottom-24 -right-16 size-64 rounded-full bg-honey/20 blur-3xl" />
+          <p className="relative inline-block rounded-full bg-white/10 px-3 py-1 text-xs font-semibold">Multi-buy</p>
+          <p className="font-display relative mt-4 text-3xl font-extrabold sm:text-4xl">
+            Buy {b.multiBuyMinItems}, save {b.multiBuyPercentOff}%
           </p>
-          <p className="mx-auto mt-3 max-w-md text-muted">
+          <p className="relative mx-auto mt-3 max-w-md text-white/75">
             Mix and match anything in the shop. The discount appears automatically in your basket — and orders of{" "}
             {formatGBPShort(toPence(b.freeDeliveryThreshold))}+ ship free.
           </p>
           <Link
             href="/shop"
-            className="mt-6 inline-flex h-12 items-center rounded-full bg-fg px-7 font-bold text-bg transition hover:-translate-y-0.5"
+            className="relative mt-7 inline-flex h-12 items-center rounded-xl bg-white px-7 font-semibold text-ink transition hover:-translate-y-0.5"
           >
             Start your basket
           </Link>

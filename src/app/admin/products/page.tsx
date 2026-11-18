@@ -6,7 +6,7 @@ import { formatGBP } from "@/lib/pricing";
 import { categoryName, store, warehouseLabels } from "@/config/store";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, btn, btnPrimary } from "@/components/admin/ui";
-import { importFromCj, loadDemoProducts, resyncFromCj, setPublished } from "../actions";
+import { importFromCj, loadDemoProducts, resyncFromCj, setPublished, setTrending } from "../actions";
 import { isLive } from "@/lib/env";
 
 export const maxDuration = 300;
@@ -99,6 +99,7 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
                     <p className="text-xs text-muted">
                       {p.variants.length} variant(s), {p.videos.length} video(s)
                       {p.isDemo && <strong className="ml-1 text-accent-fg">DEMO</strong>}
+                      {p.isTrending && <strong className="ml-1 text-danger">HOT</strong>}
                     </p>
                   </td>
                   <td className="p-2 tabular-nums">{formatGBP(p.pricePence)}</td>
@@ -114,7 +115,12 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
                   </td>
                   <td className="p-2 tabular-nums">{p.inStock ? stock : <span className="text-danger">Out</span>}</td>
                   <td className="p-2">{visible ? "Yes" : "No"}</td>
-                  <td className="p-2">
+                  <td className="space-y-1 p-2">
+                    <form action={setTrending}>
+                      <input type="hidden" name="id" value={p.id} />
+                      <input type="hidden" name="trending" value={String(!p.isTrending)} />
+                      <button className={btn}>{p.isTrending ? "Un-mark HOT" : "Mark HOT"}</button>
+                    </form>
                     <form action={setPublished}>
                       <input type="hidden" name="id" value={p.id} />
                       <input type="hidden" name="published" value={String(!p.published)} />

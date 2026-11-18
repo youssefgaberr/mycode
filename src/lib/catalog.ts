@@ -17,6 +17,7 @@ export interface ProductCardData {
   hasVariantPrices: boolean;
   image: string | null;
   isAddOn: boolean;
+  isTrending: boolean;
   isDemo: boolean;
   warehouseCountry: string;
   deliveryMinDays: number | null;
@@ -79,6 +80,7 @@ function toCard(p: CardRow): ProductCardData {
     hasVariantPrices: prices.size > 1,
     image: p.images[0]?.url ?? null,
     isAddOn: p.isAddOn,
+    isTrending: p.isTrending,
     isDemo: p.isDemo,
     warehouseCountry: p.warehouseCountry,
     deliveryMinDays: p.deliveryMinDays,
@@ -94,6 +96,25 @@ export async function getMainProducts(category?: string): Promise<ProductCardDat
   cacheTag("products");
   const rows = await fetchCards({ isAddOn: false, ...(category ? { category } : {}) });
   return rows.map(toCard);
+}
+
+/**
+ * Home-page strip: products marked trending (from CJ's trending list or by
+ * you). Falls back to the newest products, labelled "New in" by the page.
+ */
+export async function getTrendingProducts(): Promise<{ trending: boolean; products: ProductCardData[] }> {
+  "use cache";
+  cacheLife("hours");
+  cacheTag("products");
+  const trending = await fetchCards({ isTrending: true });
+  if (trending.length > 0) return { trending: true, products: trending.slice(0, 8).map(toCard) };
+  const newest = await db.product.findMany({
+    where: visibleWhere(),
+    include: cardInclude,
+    orderBy: [{ createdAt: "desc" }],
+    take: 4,
+  });
+  return { trending: false, products: newest.map(toCard) };
 }
 
 /** Add-on-only products for "Complete your order". */

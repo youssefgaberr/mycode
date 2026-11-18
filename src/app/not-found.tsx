@@ -11,7 +11,7 @@ export default function NotFound() {
       <p className="mt-3 text-muted">That page doesn&apos;t exist, or the product is no longer available.</p>
       <Link
         href="/shop"
-        className="mt-8 inline-flex h-12 items-center rounded-full bg-brand px-7 font-bold text-brand-fg hover:bg-brand-hover"
+        className="mt-8 inline-flex h-12 items-center rounded-xl bg-brand px-7 font-bold text-brand-fg hover:bg-brand-hover"
       >
         Browse the shop
       </Link>

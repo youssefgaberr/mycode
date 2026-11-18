@@ -4,62 +4,64 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * Brightpan colour system — "warm kitchen" grade.
- * Cream + espresso neutrals, terracotta brand, sage for reassurance, honey for
- * highlights. Text pairs meet WCAG AA (4.5:1) in both themes.
+ * Brightpan colour system — clean "tech gadget" look.
+ * White + cool greys, deep navy text, confident blue brand, green for
+ * reassurance, yellow for highlights. Text pairs meet WCAG AA (4.5:1).
  */
 :root {
-  --bg: #fbf7f1;
+  --bg: #ffffff;
   --surface: #ffffff;
-  --surface-2: #f4ede3;
-  --surface-3: #eadfcf;
-  --fg: #221c18;
-  --muted: #675c53;
-  --border: #e6dccd;
-  --brand: #b8471f;
-  --brand-hover: #963816;
+  --surface-2: #f3f6fb;
+  --surface-3: #e5ebf5;
+  --fg: #111827;
+  --muted: #4b5563;
+  --border: #e5e7eb;
+  --brand: #2563eb;
+  --brand-hover: #1d4ed8;
   --brand-fg: #ffffff;
-  --brand-soft: #fbe7dc;
-  --sage: #4a6b53;
-  --sage-soft: #e3ede4;
-  --honey: #f2b544;
-  --honey-soft: #fdf1d4;
-  --accent: #fff3d6;
-  --accent-fg: #6b4b0e;
-  --success: #2f7a45;
-  --danger: #b42318;
+  --brand-soft: #eff6ff;
+  --sage: #047857;
+  --sage-soft: #ecfdf5;
+  --honey: #facc15;
+  --honey-soft: #fefce8;
+  --accent: #fef9c3;
+  --accent-fg: #713f12;
+  --ink: #1d2530;
+  --success: #047857;
+  --danger: #dc2626;
   --focus: #2563eb;
-  --shadow: 34 28 24;
-  /* Photo grade: warm tint used over product imagery */
-  --grade-tint: rgb(255 196 140 / 0.18);
-  --grade-filter: saturate(1.08) contrast(1.04) sepia(0.05);
+  --shadow: 17 24 39;
+  /* Photo grade: neutral, slightly crisper product imagery */
+  --grade-tint: rgb(147 197 253 / 0.1);
+  --grade-filter: saturate(1.06) contrast(1.05);
   color-scheme: light;
 }
 
 .dark {
-  --bg: #141110;
-  --surface: #1c1815;
-  --surface-2: #25201c;
-  --surface-3: #302924;
-  --fg: #f4eee7;
-  --muted: #b9ada2;
-  --border: #3a322c;
-  --brand: #f08a5d;
-  --brand-hover: #f6a880;
-  --brand-fg: #1c1410;
-  --brand-soft: #3a2218;
-  --sage: #8db596;
-  --sage-soft: #1f2b22;
-  --honey: #f2c46b;
-  --honey-soft: #33290f;
-  --accent: #3a2d12;
-  --accent-fg: #f6dc9c;
-  --success: #6fcf8a;
-  --danger: #ff8a7a;
+  --bg: #0b1220;
+  --surface: #111a2c;
+  --surface-2: #17223a;
+  --surface-3: #1f2c48;
+  --fg: #f1f5f9;
+  --muted: #a3b1c6;
+  --border: #253350;
+  --brand: #60a5fa;
+  --brand-hover: #93c5fd;
+  --brand-fg: #0b1220;
+  --brand-soft: #172554;
+  --sage: #34d399;
+  --sage-soft: #052e22;
+  --honey: #facc15;
+  --honey-soft: #3a2f05;
+  --accent: #3a2f05;
+  --accent-fg: #fde68a;
+  --ink: #060b16;
+  --success: #34d399;
+  --danger: #f87171;
   --focus: #93c5fd;
   --shadow: 0 0 0;
-  --grade-tint: rgb(255 170 110 / 0.1);
-  --grade-filter: saturate(1.04) contrast(1.05) brightness(0.93) sepia(0.04);
+  --grade-tint: rgb(96 165 250 / 0.06);
+  --grade-filter: saturate(1.04) contrast(1.05) brightness(0.94);
   color-scheme: dark;
 }
 
@@ -80,11 +82,12 @@
   --color-honey: var(--honey);
   --color-honey-soft: var(--honey-soft);
   --color-accent: var(--accent);
+  --color-ink: var(--ink);
   --color-accent-fg: var(--accent-fg);
   --color-success: var(--success);
   --color-danger: var(--danger);
   --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
-  --font-display: var(--font-display), ui-serif, Georgia, "Times New Roman", serif;
+  --font-display: var(--font-display), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --shadow-soft: 0 1px 2px rgb(var(--shadow) / 0.06), 0 8px 24px -12px rgb(var(--shadow) / 0.18);
   --shadow-lift: 0 2px 4px rgb(var(--shadow) / 0.06), 0 18px 40px -16px rgb(var(--shadow) / 0.3);
   --animate-fade-up: fade-up 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) both;
@@ -137,8 +140,7 @@ body {
 
 .font-display {
   font-family: var(--font-display);
-  font-optical-sizing: auto;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
 }
 
 /*
@@ -169,9 +171,9 @@ body {
 /* Soft paper grain for hero/feature bands */
 .grain {
   background-image:
-    radial-gradient(circle at 15% 20%, rgb(242 181 68 / 0.18), transparent 40%),
-    radial-gradient(circle at 85% 10%, rgb(184 71 31 / 0.12), transparent 45%),
-    radial-gradient(circle at 70% 90%, rgb(74 107 83 / 0.12), transparent 40%);
+    radial-gradient(circle at 15% 20%, rgb(96 165 250 / 0.16), transparent 40%),
+    radial-gradient(circle at 85% 10%, rgb(37 99 235 / 0.1), transparent 45%),
+    radial-gradient(circle at 70% 90%, rgb(250 204 21 / 0.12), transparent 40%);
 }
 .dark .grain {
   background-image:
@@ -193,8 +195,8 @@ body {
 
 .prose-policy h2 {
   font-family: var(--font-display);
-  font-size: 1.35rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   margin-top: 2rem;
   margin-bottom: 0.5rem;
 }

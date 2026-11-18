@@ -72,7 +72,7 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
           <p className="text-lg">Your basket is empty.</p>
           <Link
             href="/shop"
-            className="mt-6 inline-flex h-12 items-center rounded-full bg-brand px-7 font-bold text-brand-fg hover:bg-brand-hover"
+            className="mt-6 inline-flex h-12 items-center rounded-xl bg-brand px-7 font-bold text-brand-fg hover:bg-brand-hover"
           >
             Start shopping
           </Link>
@@ -196,7 +196,7 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
           type="button"
           onClick={checkout}
           disabled={checkingOut || loading}
-          className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-brand font-bold text-brand-fg hover:bg-brand-hover disabled:opacity-60"
+          className="flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand font-bold text-brand-fg hover:bg-brand-hover disabled:opacity-60"
         >
           <LockIcon className="size-5" />
           {checkingOut ? "Opening checkout…" : "Checkout securely"}

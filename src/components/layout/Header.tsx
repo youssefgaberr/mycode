@@ -3,11 +3,11 @@ import { store } from "@/config/store";
 import { PanMark } from "@/components/category-icons";
 import { BasketLink } from "./BasketLink";
 import { ThemeToggle } from "./ThemeToggle";
+import { MarketSwitcher } from "@/components/market/MarketSwitcher";
 
 const links = [
   { href: "/shop", label: "Shop all" },
   { href: "/delivery", label: "Delivery" },
-  { href: "/returns", label: "Returns" },
   { href: "/contact", label: "Contact" },
 ];
 
@@ -36,6 +36,7 @@ export function Header() {
         >
           Shop
         </Link>
+        <MarketSwitcher />
         <ThemeToggle />
         <BasketLink />
       </div>

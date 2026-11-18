@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { store } from "@/config/store";
 import type { ProductCardData } from "@/lib/catalog";
 import type { PricedBasket } from "@/lib/checkout";
-import { formatGBP } from "@/lib/pricing";
+import { formatMoney } from "@/lib/pricing";
+import { useMarket } from "@/components/market/useMarket";
 import { useBasket } from "./BasketProvider";
 import { ProductImage } from "@/components/product/ProductImage";
 import { CompleteYourOrder } from "@/components/product/CompleteYourOrder";
@@ -14,6 +15,8 @@ import { LockIcon } from "@/components/icons";
 
 export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
   const { lines, ready, setQuantity, remove, replace } = useBasket();
+  const market = useMarket();
+  const money = (n: number) => formatMoney(n, store.markets[market]);
   const [quote, setQuote] = useState<PricedBasket | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -21,11 +24,11 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
   const [notice, setNotice] = useState<string | null>(null);
   const router = useRouter();
 
-  const key = JSON.stringify(lines);
+  const key = JSON.stringify({ lines, market });
   useEffect(() => {
     if (!ready) return;
     const controller = new AbortController();
-    const current = JSON.parse(key) as typeof lines;
+    const current = (JSON.parse(key) as { lines: typeof lines }).lines;
     if (current.length === 0) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setQuote(null);
@@ -36,7 +39,7 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
     fetch("/api/basket/quote", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ lines: current }),
+      body: JSON.stringify({ lines: current, market }),
       signal: controller.signal,
     })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error("quote failed"))))
@@ -53,7 +56,7 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
       })
       .finally(() => setLoading(false));
     return () => controller.abort();
-  }, [key, ready, replace]);
+  }, [key, ready, replace, market]);
 
   function checkout() {
     setCheckingOut(true);
@@ -104,7 +107,7 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
                   {l.title}
                 </Link>
                 {l.showVariantName && <p className="text-sm text-muted">{l.variantName}</p>}
-                <p className="text-sm text-muted">{formatGBP(l.unitPricePence)} each</p>
+                <p className="text-sm text-muted">{money(l.unitPricePence)} each</p>
                 <div className="mt-auto flex items-center gap-3 pt-2">
                   <div className="inline-flex items-center rounded-full border border-border">
                     <button
@@ -137,7 +140,7 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
                   </button>
                 </div>
               </div>
-              <p className="font-bold tabular-nums">{formatGBP(l.lineTotalPence)}</p>
+              <p className="font-bold tabular-nums">{money(l.lineTotalPence)}</p>
             </li>
           ))}
         </ul>
@@ -157,33 +160,37 @@ export function BasketView({ addOns }: { addOns: ProductCardData[] }) {
         )}
         {!t.freeDelivery && t.spendToFreeDeliveryPence > 0 && (
           <p className="rounded-lg bg-accent p-3 text-sm text-accent-fg">
-            Spend {formatGBP(t.spendToFreeDeliveryPence)} more for free delivery.
+            Spend {money(t.spendToFreeDeliveryPence)} more for free delivery.
           </p>
         )}
 
         <dl className="space-y-2 text-sm" aria-live="polite" aria-busy={loading}>
           <div className="flex justify-between">
             <dt>Items ({t.itemCount})</dt>
-            <dd className="tabular-nums">{formatGBP(t.subtotalPence)}</dd>
+            <dd className="tabular-nums">{money(t.subtotalPence)}</dd>
           </div>
           {t.discountPence > 0 && (
             <div className="flex justify-between text-success">
               <dt>Multi-buy {b.multiBuyPercentOff}% off</dt>
-              <dd className="tabular-nums">−{formatGBP(t.discountPence)}</dd>
+              <dd className="tabular-nums">−{money(t.discountPence)}</dd>
             </div>
           )}
           <div className="flex justify-between">
-            <dt>UK delivery</dt>
-            <dd className="tabular-nums">{t.deliveryPence === 0 ? "Free" : formatGBP(t.deliveryPence)}</dd>
+            <dt>{market === "GB" ? "UK" : "US"} delivery</dt>
+            <dd className="tabular-nums">{t.deliveryPence === 0 ? "Free" : money(t.deliveryPence)}</dd>
           </div>
           <div className="flex justify-between border-t border-border pt-3 text-base font-bold">
             <dt>Total</dt>
-            <dd className="tabular-nums">{formatGBP(t.totalPence)}</dd>
+            <dd className="tabular-nums">{money(t.totalPence)}</dd>
           </div>
-          <div className="flex justify-between text-muted">
-            <dt>Includes VAT</dt>
-            <dd className="tabular-nums">{formatGBP(t.vatPence)}</dd>
-          </div>
+          {store.markets[market].pricesIncludeTax ? (
+            <div className="flex justify-between text-muted">
+              <dt>Includes VAT</dt>
+              <dd className="tabular-nums">{money(t.vatPence)}</dd>
+            </div>
+          ) : (
+            <p className="text-xs text-muted">Any applicable sales tax is shown at checkout.</p>
+          )}
         </dl>
 
         {error && (

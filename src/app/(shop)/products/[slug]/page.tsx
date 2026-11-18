@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { categoryName, store } from "@/config/store";
 import { getAddOnProducts, getProductBySlug, getProductSlugs } from "@/lib/catalog";
-import { formatGBPShort, toPence } from "@/lib/pricing";
+import { DeliveryCountry, DeliveryFee, FreeDeliveryFrom } from "@/components/market/MarketText";
 import { Gallery } from "@/components/product/Gallery";
 import { AddToBasket } from "@/components/product/AddToBasket";
 import { CompleteYourOrder } from "@/components/product/CompleteYourOrder";
@@ -89,8 +89,8 @@ async function ProductContent({ params }: Pick<PageProps<"/products/[slug]">, "p
           <AddToBasket product={product} />
 
           <p className="text-sm text-muted">
-            Buy {b.multiBuyMinItems}+ items and save {b.multiBuyPercentOff}%. Free UK delivery over{" "}
-            {formatGBPShort(toPence(b.freeDeliveryThreshold))}, otherwise {formatGBPShort(toPence(b.deliveryFee))}.{" "}
+            Buy {b.multiBuyMinItems}+ items and save {b.multiBuyPercentOff}%. Free <DeliveryCountry /> delivery over{" "}
+            <FreeDeliveryFrom />, otherwise <DeliveryFee />.{" "}
             <Link href="/returns" className="underline">
               14-day returns
             </Link>

@@ -6,7 +6,7 @@ import { formatGBP } from "@/lib/pricing";
 import { categoryName, store, warehouseLabels } from "@/config/store";
 import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, btn, btnPrimary } from "@/components/admin/ui";
-import { importFromCj, loadDemoProducts, resyncFromCj, setPublished, setTrending } from "../actions";
+import { importFromCj, importTrending, loadDemoProducts, resyncFromCj, setPublished, setTrending } from "../actions";
 import { isLive } from "@/lib/env";
 
 export const maxDuration = 300;
@@ -21,7 +21,7 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
       include: { variants: { where: { active: true } }, images: { take: 1, orderBy: { position: "asc" } }, videos: true },
       orderBy: [{ isAddOn: "asc" }, { createdAt: "asc" }],
     }),
-    db.syncLog.findFirst({ where: { kind: { in: ["sync", "admin-import"] } }, orderBy: { startedAt: "desc" } }),
+    db.syncLog.findFirst({ where: { kind: { in: ["sync", "admin-import", "admin-trending"] } }, orderBy: { startedAt: "desc" } }),
   ]);
 
   return (
@@ -34,6 +34,11 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
             <SubmitButton className={btn} pendingText="Loading…">Load demo products</SubmitButton>
           </form>
         )}
+        <form action={importTrending}>
+          <SubmitButton className={btnPrimary} pendingText="Finding & writing trending products… (about 4 min)">
+            Import trending products (AI)
+          </SubmitButton>
+        </form>
         <form action={importFromCj}>
           <SubmitButton className={btn} pendingText="Importing from CJ… (1–3 min)">Import products from CJ</SubmitButton>
         </form>
@@ -48,6 +53,9 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
         </p>
       )}
       <p className="text-sm text-muted">
+        <strong>Import trending products (AI)</strong> finds products on CJ&apos;s trending lists across every category,
+        writes an original title and description for each with AI (≈$0.02 each, which also screens out restricted
+        items), prices them for the UK and US, and publishes them marked HOT — about 10–12 per run.{" "}
         <strong>Import products from CJ</strong> finds the best CJ match for each product in your content file (takes 1–3
         minutes; keep this page open). It replaces any demo products.
       </p>

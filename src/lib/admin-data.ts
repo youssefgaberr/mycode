@@ -2,7 +2,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { store } from "@/config/store";
 import { toPence } from "@/lib/pricing";
-import { orderProfitPence } from "@/lib/orders";
+import { orderProfitPence, toGbpMinor } from "@/lib/orders";
 
 /** Orders that represent real sales (paid and not cancelled/refunded). */
 export const SOLD_STATUSES = ["PAID", "SUBMITTING", "SENT_TO_CJ", "SHIPPED", "DELIVERED", "NEEDS_ATTENTION"];
@@ -43,7 +43,6 @@ export async function getDailySummary(days = 14): Promise<{ rows: DaySummary[]; 
     where: { status: { in: SOLD_STATUSES }, paidAt: { gte: since } },
     orderBy: { paidAt: "desc" },
   });
-  const adCost = toPence(store.pricing.adCostPerOrder);
   const byDay = new Map<string, DaySummary>();
   const blank = (day: string): DaySummary => ({
     day,
@@ -64,14 +63,17 @@ export async function getDailySummary(days = 14): Promise<{ rows: DaySummary[]; 
     const d = londonDay.format(o.paidAt!);
     const row = byDay.get(d) ?? blank(d);
     const p = orderProfitPence(o);
+    // Everything in the summary is shown in GBP (USD orders converted at the configured rate).
+    const gbp = (minor: number) => toGbpMinor(minor, o.market);
+    const ads = toGbpMinor(toPence(store.markets[o.market as keyof typeof store.markets]?.adCostPerOrder ?? store.pricing.adCostPerOrder) , o.market);
     for (const r of [row, totals]) {
       r.orders++;
-      r.revenuePence += o.totalPence;
-      r.vatPence += o.vatPence;
-      r.supplierCostPence += p.supplierCostPence;
-      r.stripeFeesPence += p.stripeFeePence;
-      r.profitPence += p.profitPence;
-      r.profitAfterAdsPence += p.profitPence - adCost;
+      r.revenuePence += gbp(o.totalPence);
+      r.vatPence += gbp(o.vatPence);
+      r.supplierCostPence += gbp(p.supplierCostPence);
+      r.stripeFeesPence += gbp(p.stripeFeePence);
+      r.profitPence += gbp(p.profitPence);
+      r.profitAfterAdsPence += gbp(p.profitPence) - ads;
     }
     byDay.set(d, row);
   }

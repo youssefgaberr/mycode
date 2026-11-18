@@ -132,3 +132,25 @@ describe("discovery safety filter", () => {
     expect(isEligible("Multifunctional Slotted Spoon Grinding Cooking Spoon Garlic")).toBe(true);
   });
 });
+
+describe("trending pre-filter", () => {
+  it("blocks restricted items and allows ordinary gadgets", async () => {
+    const { trendingAllowed } = await import("@/lib/cj/trending");
+    expect(trendingAllowed("Portable Folding Silicone Water Bottle")).toBe(true);
+    expect(trendingAllowed("Car Seat Gap Organizer Storage Box")).toBe(true);
+    expect(trendingAllowed("Dog Leash Retractable")).toBe(true);
+    expect(trendingAllowed("Kids Toy Car Remote Control")).toBe(false);
+    expect(trendingAllowed("Infrared Thermometer Digital")).toBe(false);
+    expect(trendingAllowed("Folding Pocket Knife Camping")).toBe(false);
+    expect(trendingAllowed("Mini Juicer Blender UK Plug")).toBe(false);
+  });
+});
+
+describe("AI copy schema", () => {
+  it("accepts well-formed copy and rejects unknown categories", async () => {
+    const { CopySchema } = await import("@/lib/ai/copywriter");
+    const good = { sellable: true, reason: "ok", category: "pets", title: "Retractable Dog Lead", summary: "s", description: "d", bullets: ["a", "b", "c", "d"] };
+    expect(CopySchema.safeParse(good).success).toBe(true);
+    expect(CopySchema.safeParse({ ...good, category: "toys" }).success).toBe(false);
+  });
+});

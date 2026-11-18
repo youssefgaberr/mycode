@@ -2,7 +2,8 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { requireAdmin } from "@/lib/admin-auth";
 import { getAdminCounts, getAdminOrders, getDailySummary } from "@/lib/admin-data";
-import { formatGBP } from "@/lib/pricing";
+import { formatGBP, formatMoney } from "@/lib/pricing";
+import { marketConfig } from "@/config/store";
 import { isLive } from "@/lib/env";
 import { store } from "@/config/store";
 import { SubmitButton } from "@/components/admin/SubmitButton";
@@ -84,7 +85,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/admin">, "searchPara
           </table>
         </div>
         <p className="text-xs text-muted">
-          Profit = revenue − VAT − supplier cost (CJ&apos;s actual charge once known, otherwise the estimate) − Stripe fees.
+          All amounts in GBP (US orders converted at the rate in the config file). Profit = revenue − VAT − supplier cost (CJ&apos;s actual charge once known, otherwise the estimate) − Stripe fees.
           &quot;After ads&quot; also subtracts the ad cost per order from the config file.
         </p>
       </section>
@@ -159,7 +160,10 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/admin">, "searchPara
                     <StatusBadge status={o.status} />
                     {o.attentionReason && <p className="mt-1 max-w-xs whitespace-pre-line text-xs text-danger">{o.attentionReason}</p>}
                   </td>
-                  <td className="p-2 tabular-nums">{formatGBP(o.totalPence)}</td>
+                  <td className="p-2 tabular-nums">
+                    {formatMoney(o.totalPence, marketConfig(o.market))}
+                    <p className="text-xs text-muted">{marketConfig(o.market).flag} {o.currency}</p>
+                  </td>
                   <td className="p-2 text-xs">
                     {o.shipments.length === 0 && <span className="text-muted">—</span>}
                     {o.shipments.map((s) => (
@@ -191,7 +195,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/admin">, "searchPara
                       ))}
                   </td>
                   <td className={`p-2 tabular-nums ${o.profit.profitPence < 0 ? "text-danger" : ""}`}>
-                    {formatGBP(o.profit.profitPence)}
+                    {formatMoney(o.profit.profitPence, marketConfig(o.market))}
                     <p className="text-xs text-muted">{o.profit.costIsActual ? "actual cost" : "est. cost"}</p>
                   </td>
                   <td className="space-y-1 p-2">
@@ -214,13 +218,15 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/admin">, "searchPara
                           <input type="hidden" name="id" value={o.id} />
                           <label className="flex items-center gap-1">
                             <input type="checkbox" name="confirm" value="yes" required /> Refund{" "}
-                            {formatGBP(o.totalPence - o.refundedPence)} to the customer
+                            {formatMoney(o.totalPence - o.refundedPence, marketConfig(o.market))} to the customer
                           </label>
                           <button className={btn}>Confirm refund</button>
                         </form>
                       </details>
                     )}
-                    {o.refundedPence > 0 && <p className="text-xs text-muted">Refunded {formatGBP(o.refundedPence)}</p>}
+                    {o.refundedPence > 0 && (
+                      <p className="text-xs text-muted">Refunded {formatMoney(o.refundedPence, marketConfig(o.market))}</p>
+                    )}
                     {!["PENDING_PAYMENT", "EXPIRED"].includes(o.status) && (
                       <form action={setOrderStatus} className="flex gap-1">
                         <input type="hidden" name="id" value={o.id} />

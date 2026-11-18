@@ -4,12 +4,13 @@
  * from the database.
  */
 import { z } from "zod";
-import { store } from "@/config/store";
+import { MARKETS, store, type MarketCode } from "@/config/store";
 import { db } from "@/lib/db";
 import { isLive } from "@/lib/env";
 import { calculateBasket, type BasketTotals } from "@/lib/basket";
 
 export const basketInputSchema = z.object({
+  market: z.enum(MARKETS as [MarketCode, ...MarketCode[]]).default("GB"),
   lines: z
     .array(
       z.object({
@@ -41,6 +42,8 @@ export interface PricedLine {
 }
 
 export interface PricedBasket {
+  market: MarketCode;
+  currency: string;
   lines: PricedLine[];
   /** Variant ids that are no longer available and were dropped. */
   removed: string[];
@@ -48,6 +51,8 @@ export interface PricedBasket {
 }
 
 export async function priceBasket(input: BasketInput): Promise<PricedBasket> {
+  const marketCode = input.market ?? "GB";
+  const market = store.markets[marketCode];
   // Merge duplicate lines.
   const merged = new Map<string, number>();
   for (const l of input.lines) {
@@ -61,6 +66,7 @@ export async function priceBasket(input: BasketInput): Promise<PricedBasket> {
       product: { published: true, inStock: true, ...(isLive() ? { isDemo: false } : {}) },
     },
     include: {
+      markets: { where: { market: marketCode, available: true } },
       product: {
         include: {
           images: { orderBy: { position: "asc" }, take: 1 },
@@ -75,7 +81,20 @@ export async function priceBasket(input: BasketInput): Promise<PricedBasket> {
   const removed: string[] = [];
   for (const [variantId, quantity] of merged) {
     const v = byId.get(variantId);
-    if (!v) {
+    // Price/shipping for this market; UK falls back to the variant's own fields
+    // for products imported before markets existed.
+    const vm =
+      v?.markets[0] ??
+      (v && marketCode === "GB" && (await db.variantMarket.count({ where: { variantId: v.id } })) === 0
+        ? {
+            priceMinor: v.pricePence,
+            supplierCostMinor: v.supplierCostPence,
+            shippingCostMinor: v.shippingCostPence,
+            warehouseCountry: v.warehouseCountry,
+            logisticName: v.logisticName,
+          }
+        : null);
+    if (!v || !vm) {
       removed.push(variantId);
       continue;
     }
@@ -89,14 +108,14 @@ export async function priceBasket(input: BasketInput): Promise<PricedBasket> {
       showVariantName: v.product._count.variants > 1,
       image: v.imageUrl ?? v.product.images[0]?.url ?? null,
       quantity,
-      unitPricePence: v.pricePence,
-      unitCostPence: v.supplierCostPence + v.shippingCostPence,
-      lineTotalPence: v.pricePence * quantity,
-      warehouseCountry: v.warehouseCountry,
-      logisticName: v.logisticName,
+      unitPricePence: vm.priceMinor,
+      unitCostPence: vm.supplierCostMinor + vm.shippingCostMinor,
+      lineTotalPence: vm.priceMinor * quantity,
+      warehouseCountry: vm.warehouseCountry,
+      logisticName: vm.logisticName,
       isDemo: v.product.isDemo,
     });
   }
 
-  return { lines, removed, totals: calculateBasket(lines) };
+  return { market: marketCode, currency: market.currency, lines, removed, totals: calculateBasket(lines, market) };
 }

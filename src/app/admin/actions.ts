@@ -10,12 +10,15 @@ import { checkPassword, endAdminSession, requireAdmin, startAdminSession } from 
 import { fetchOffer, fetchVideos, saveProduct, syncCatalog } from "@/lib/cj/catalog";
 import { importProducts, PIN_PREFIX } from "@/lib/cj/import";
 import { discoverProducts, searchToSourcing } from "@/lib/cj/discover";
+import { importTrendingProducts } from "@/lib/cj/trending";
+import { aiConfigured } from "@/lib/ai/copywriter";
 import { contentByKey } from "@/content/products";
 import { seedDemoProducts } from "@/lib/demo";
 import * as cj from "@/lib/cj/client";
 import { checkTracking, retryCjSubmission } from "@/lib/orders";
 import { getStripe } from "@/lib/stripe";
-import { formatGBP } from "@/lib/pricing";
+import { formatGBP, formatMoney } from "@/lib/pricing";
+import { marketConfig } from "@/config/store";
 
 const back = (path: string, msg: string): never => redirect(`${path}?msg=${encodeURIComponent(msg)}`);
 
@@ -114,6 +117,25 @@ export async function discoverTrending() {
   back("/admin/sourcing", msg);
 }
 
+/**
+ * Imports a batch of trending products from CJ with AI-written copy and
+ * publishes them (marked HOT). About 10–12 per run; run again for more.
+ */
+export async function importTrending() {
+  await requireAdmin();
+  if (!cjConfigured()) back("/admin/products", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
+  if (!aiConfigured()) back("/admin/products", "Add ANTHROPIC_API_KEY in Vercel → Settings → Environment Variables (needed to write product descriptions), redeploy, then try again.");
+  const msg = await withRunLog(
+    "trending",
+    (log) => importTrendingProducts({ limit: 12, log }),
+    (r) =>
+      `Published ${r.published} trending product(s)${r.titles.length ? `: ${r.titles.slice(0, 6).join(", ")}${r.titles.length > 6 ? "…" : ""}` : ""}. ` +
+      `${r.rejected} screened out, ${r.skipped} not shippable, ${r.failed} failed. Run again for more.`,
+  );
+  updateTag("products");
+  back("/admin/products", msg);
+}
+
 /** Search CJ for a keyword and add the best listings to the sourcing database. */
 export async function searchCj(formData: FormData) {
   await requireAdmin();
@@ -141,10 +163,10 @@ export async function useForCoreProduct(formData: FormData) {
   const candidate = await db.sourcingCandidate.findUniqueOrThrow({ where: { id } });
   let msg: string;
   try {
-    const { detail, offer } = await fetchOffer(candidate.cjProductId);
+    const { detail, offer, offers } = await fetchOffer(candidate.cjProductId);
     if (!offer) throw new Error("No in-stock variant ships to the UK any more.");
     const videos = await fetchVideos(candidate.cjProductId);
-    const product = await saveProduct({ content: content!, detail, offer, videos });
+    const product = await saveProduct({ content: content!, detail, offer, offers, videos });
     const pinKey = `${PIN_PREFIX}${key}`;
     await db.setting.upsert({
       where: { key: pinKey },
@@ -224,7 +246,7 @@ export async function refundOrder(formData: FormData) {
       { idempotencyKey: `refund_${order.id}_${remaining}` },
     );
     await db.order.update({ where: { id }, data: { status: "REFUNDED", refundedPence: order.totalPence, attentionReason: null } });
-    msg = `Refunded ${formatGBP(remaining)} for ${order.number}. If CJ hasn't shipped it, cancel the CJ order in your CJ dashboard.`;
+    msg = `Refunded ${formatMoney(remaining, marketConfig(order.market))} for ${order.number}. If CJ hasn't shipped it, cancel the CJ order in your CJ dashboard.`;
   } catch (err) {
     msg = `Refund failed: ${(err as Error).message}`;
   }
@@ -299,7 +321,7 @@ export async function publishCandidate(formData: FormData) {
   const candidate = await db.sourcingCandidate.findUniqueOrThrow({ where: { id: f.id } });
   let msg: string;
   try {
-    const { detail, offer } = await fetchOffer(candidate.cjProductId);
+    const { detail, offer, offers } = await fetchOffer(candidate.cjProductId);
     if (!offer) throw new Error("No in-stock variant ships to the UK any more.");
     const videos = await fetchVideos(candidate.cjProductId);
     const product = await saveProduct({
@@ -315,6 +337,7 @@ export async function publishCandidate(formData: FormData) {
       },
       detail,
       offer,
+      offers,
       videos,
     });
     await db.sourcingCandidate.update({ where: { id: f.id }, data: { status: "PUBLISHED", productId: product.id } });

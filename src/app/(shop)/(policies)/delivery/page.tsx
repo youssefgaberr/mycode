@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { store } from "@/config/store";
-import { formatGBPShort, toPence } from "@/lib/pricing";
+import { formatMoneyShort, toPence } from "@/lib/pricing";
 import { Email, PolicyPage } from "@/components/policy/Policy";
 
 export const metadata: Metadata = { title: "Delivery" };
@@ -11,15 +11,23 @@ export default function DeliveryPage() {
   return (
     <PolicyPage title="Delivery information" updated="[DATE]">
       <h2>Where we deliver</h2>
-      <p>We currently deliver to addresses in the United Kingdom only.</p>
+      <p>
+        We deliver to the <strong>United Kingdom</strong> and the <strong>United States</strong>. Use the £/$ switch at
+        the top of the page to see prices and delivery times for your country.
+      </p>
 
       <h2>Delivery charges</h2>
       <ul>
-        <li>
-          <strong>Free delivery</strong> on orders of {formatGBPShort(toPence(b.freeDeliveryThreshold))} or more (after any
-          discount).
-        </li>
-        <li>Otherwise delivery costs {formatGBPShort(toPence(b.deliveryFee))} per order.</li>
+        {(["GB", "US"] as const).map((code) => {
+          const m = store.markets[code];
+          return (
+            <li key={code}>
+              <strong>{m.label}:</strong> free delivery on orders of{" "}
+              {formatMoneyShort(toPence(m.freeDeliveryThreshold), m)} or more (after any discount), otherwise{" "}
+              {formatMoneyShort(toPence(m.deliveryFee), m)} per order. {m.pricesIncludeTax ? "Prices include VAT." : "Prices exclude any sales tax."}
+            </li>
+          );
+        })}
         <li>
           Buy {b.multiBuyMinItems} or more items and get {b.multiBuyPercentOff}% off your items.
         </li>
@@ -44,8 +52,8 @@ export default function DeliveryPage() {
 
       <h2>Customs, duty and VAT</h2>
       <p>
-        Our prices include UK VAT. You shouldn&apos;t be asked to pay anything extra when your parcel arrives. If a
-        carrier asks you for a fee, please contact us before paying.
+        UK prices include VAT. US prices exclude any sales tax. You shouldn&apos;t be asked to pay anything extra when
+        your parcel arrives. If a carrier asks you for a fee, please contact us before paying.
       </p>
 
       <h2>Late, lost or damaged parcels</h2>

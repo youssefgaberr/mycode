@@ -13,7 +13,8 @@
 import type Stripe from "stripe";
 import { db } from "@/lib/db";
 import { isLive } from "@/lib/env";
-import { estimateStripeFeePence, usdToPence, vatIncludedPence } from "@/lib/pricing";
+import { taxIncludedMinor, toPence } from "@/lib/pricing";
+import { marketConfig } from "@/config/store";
 import { orderConfirmationEmail, sendEmail, shippedEmail } from "@/lib/email";
 import * as cj from "@/lib/cj/client";
 import { num, pickFreight } from "@/lib/cj/catalog";
@@ -24,7 +25,13 @@ export type CjOrderApi = Pick<
   "freightCalculate" | "createOrder" | "getOrderDetail" | "getOrderDetailBatch"
 >;
 
-const COUNTRY_NAMES: Record<string, string> = { GB: "United Kingdom" };
+const COUNTRY_NAMES: Record<string, string> = { GB: "United Kingdom", US: "United States" };
+
+/** Estimated card fee for a charge in the order's market. */
+function estimateFeeMinor(totalMinor: number, market: string) {
+  const m = marketConfig(market);
+  return totalMinor > 0 ? Math.round(totalMinor * m.stripeFeePercent) + toPence(m.stripeFeeFixed) : 0;
+}
 
 // ── payment ─────────────────────────────────────────────────────────────────
 
@@ -66,8 +73,8 @@ export async function markOrderPaid(session: Stripe.Checkout.Session): Promise<s
       discountPence: session.total_details?.amount_discount ?? order.discountPence,
       deliveryPence: session.total_details?.amount_shipping ?? order.deliveryPence,
       totalPence: total,
-      vatPence: vatIncludedPence(total),
-      stripeFeePence: estimateStripeFeePence(total),
+      vatPence: taxIncludedMinor(total, marketConfig(order.market)),
+      stripeFeePence: estimateFeeMinor(total, order.market),
       stripeFeeIsEstimate: true,
     },
   });
@@ -117,7 +124,10 @@ export async function recordStripeFee(stripe: Stripe, orderId: string) {
   const charge = pi.latest_charge;
   const bt = charge && typeof charge !== "string" ? charge.balance_transaction : null;
   if (bt && typeof bt !== "string") {
-    await db.order.update({ where: { id: orderId }, data: { stripeFeePence: bt.fee, stripeFeeIsEstimate: false } });
+    // The fee is in the account's settlement currency; convert it back to the order's currency.
+    const amount = charge && typeof charge !== "string" ? charge.amount : 0;
+    const fee = bt.amount > 0 && amount > 0 ? Math.round((bt.fee * amount) / bt.amount) : bt.fee;
+    await db.order.update({ where: { id: orderId }, data: { stripeFeePence: fee, stripeFeeIsEstimate: false } });
   }
 }
 
@@ -413,8 +423,12 @@ export async function checkTracking(api: Pick<typeof cj, "getOrderDetailBatch"> 
 
 // ── reporting helpers ───────────────────────────────────────────────────────
 
-/** Profit for one order: revenue ex VAT − supplier cost (actual from CJ if known) − Stripe fee. */
+/**
+ * Profit for one order, in the order's own currency (minor units): revenue ex
+ * tax − supplier cost (actual from CJ if known) − card fee.
+ */
 export function orderProfitPence(order: {
+  market?: string;
   totalPence: number;
   vatPence: number;
   refundedPence?: number;
@@ -422,11 +436,12 @@ export function orderProfitPence(order: {
   cjCostUsd: number | null;
   stripeFeePence: number | null;
 }) {
-  const cost = order.cjCostUsd ? usdToPence(order.cjCostUsd) : order.estCostPence;
-  const fee = order.stripeFeePence ?? estimateStripeFeePence(order.totalPence);
-  // Refunds reduce revenue (and the VAT due on it); Stripe keeps its fee.
+  const m = marketConfig(order.market);
+  const cost = order.cjCostUsd ? Math.round(order.cjCostUsd * m.fxFromUsd * 100) : order.estCostPence;
+  const fee = order.stripeFeePence ?? estimateFeeMinor(order.totalPence, order.market ?? "GB");
+  // Refunds reduce revenue (and the tax due on it); the card fee is kept by Stripe.
   const kept = order.totalPence - (order.refundedPence ?? 0);
-  const revenueExVatPence = kept - vatIncludedPence(kept);
+  const revenueExVatPence = kept - taxIncludedMinor(kept, m);
   return {
     revenueExVatPence,
     supplierCostPence: cost,
@@ -434,4 +449,11 @@ export function orderProfitPence(order: {
     stripeFeePence: fee,
     profitPence: revenueExVatPence - cost - fee,
   };
+}
+
+/** Convert an amount in a market's currency to GBP pence (for reports). */
+export function toGbpMinor(minor: number, market: string | undefined) {
+  const from = marketConfig(market);
+  const gb = marketConfig("GB");
+  return Math.round((minor / from.fxFromUsd) * gb.fxFromUsd);
 }

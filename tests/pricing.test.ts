@@ -9,6 +9,8 @@ import {
   vatIncludedPence,
 } from "@/lib/pricing";
 import { calculateBasket } from "@/lib/basket";
+import { priceForMarket } from "@/lib/pricing";
+import { store } from "@/config/store";
 
 describe("shopPricePence", () => {
   it("applies 2.5x markup and rounds to .99", () => {
@@ -111,5 +113,36 @@ describe("calculateBasket", () => {
     expect(t.freeDelivery).toBe(true);
     expect(t.totalPence).toBe(3599);
     expect(t.vatPence).toBe(600);
+  });
+});
+
+describe("multi-market pricing", () => {
+  it("UK: GBP, VAT-inclusive, same rule as before", () => {
+    // $16 + $3 at 0.79 = £12.64 + £2.37 → ×2.5 = £37.53 → £37.99
+    const uk = priceForMarket(16, 3, store.markets.GB);
+    expect(uk.priceMinor).toBe(3799);
+    expect(uk.priceMinor).toBe(priceVariant(16, 3, 0.79).pricePence);
+  });
+
+  it("US: USD, no VAT, import-duty allowance on the supplier cost", () => {
+    // $16 + 30% duty ($4.80) + $3 ship = $23.80 → ×2.5 = $59.50 → $59.99
+    const us = priceForMarket(16, 3, store.markets.US);
+    expect(us.priceMinor).toBe(5999);
+    expect(us.supplierCostMinor).toBe(2080);
+    // 5999 − 2080 − 300 − (174 + 30 Stripe) − 1000 ads
+    expect(us.estProfitMinor).toBe(5999 - 2080 - 300 - 204 - 1000);
+    expect(us.isAddOn).toBe(false);
+  });
+
+  it("US minimum price is $14.99", () => {
+    expect(priceForMarket(1, 1, store.markets.US).priceMinor).toBe(1499);
+  });
+
+  it("US basket: free delivery from $45, no VAT", () => {
+    const t = calculateBasket([{ unitPricePence: 2499, quantity: 2 }], store.markets.US);
+    expect(t.freeDelivery).toBe(true);
+    expect(t.vatPence).toBe(0);
+    const t2 = calculateBasket([{ unitPricePence: 1999, quantity: 1 }], store.markets.US);
+    expect(t2.deliveryPence).toBe(499);
   });
 });

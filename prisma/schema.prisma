@@ -87,7 +87,35 @@ model Variant {
   position         Int     @default(0)
   updatedAt        DateTime @updatedAt
 
+  markets VariantMarket[]
+
   @@index([productId])
+}
+
+/// Price, shipping and availability of a variant in one market (GB, US…).
+/// Amounts are in that market's currency, in minor units (pence/cents).
+model VariantMarket {
+  id               String  @id @default(cuid())
+  variantId        String
+  variant          Variant @relation(fields: [variantId], references: [id], onDelete: Cascade)
+  market           String
+  currency         String
+  priceMinor       Int
+  supplierCostMinor Int
+  shippingCostMinor Int
+  estProfitMinor   Int
+  isAddOn          Boolean @default(false)
+  shippingCostUsd  Float
+  warehouseCountry String
+  logisticName     String?
+  deliveryMinDays  Int?
+  deliveryMaxDays  Int?
+  stock            Int     @default(0)
+  available        Boolean @default(true)
+  updatedAt        DateTime @updatedAt
+
+  @@unique([variantId, market])
+  @@index([market])
 }
 
 model ProductImage {
@@ -122,6 +150,10 @@ model Order {
   stripePaymentIntentId String?
   status                String   @default("PENDING_PAYMENT")
   attentionReason       String?
+  /// Market the customer bought in (GB, US…) and the currency of every
+  /// amount on this order (minor units: pence/cents)
+  market                String   @default("GB")
+  currency              String   @default("GBP")
   /// true when paid with Stripe test keys / sent to CJ as a sandbox order
   isTest                Boolean  @default(true)
 

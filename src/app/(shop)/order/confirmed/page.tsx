@@ -2,9 +2,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Suspense } from "react";
 import { db } from "@/lib/db";
-import { formatGBP } from "@/lib/pricing";
+import { formatMoney } from "@/lib/pricing";
 import { getStripe } from "@/lib/stripe";
-import { store } from "@/config/store";
+import { marketConfig, store } from "@/config/store";
 import { CheckIcon } from "@/components/icons";
 import { ClearBasket } from "@/components/basket/ClearBasket";
 
@@ -49,6 +49,7 @@ async function Confirmation({ searchParams }: Pick<PageProps<"/order/confirmed">
     );
   }
 
+  const formatGBP = (minor: number) => formatMoney(minor, marketConfig(order.market));
   return (
     <div>
       <ClearBasket />

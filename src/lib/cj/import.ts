@@ -37,7 +37,7 @@ export async function importProducts(opts: { keys?: string[]; log?: (s: string) 
         continue;
       }
       const videos = await fetchVideos(match.detail.pid);
-      const product = await saveProduct({ content, detail: match.detail, offer: match.offer, videos });
+      const product = await saveProduct({ content, detail: match.detail, offer: match.offer, offers: match.offers, videos });
       const main = match.offer.variants[0];
       log(
         `  ✓ ${product.title} — ${formatGBP(product.pricePence)}` +

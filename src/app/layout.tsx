@@ -18,7 +18,8 @@ export const viewport: Viewport = {
   ],
 };
 
-// Applies the saved theme before first paint, so there's no flash.
+// Applies the saved theme and market (currency) before first paint, so there's no flash.
+const marketScript = `(function(){try{var m=(document.cookie.match(/(?:^|; )bp_market=(GB|US)/)||[])[1];if(!m){var tz=(Intl.DateTimeFormat().resolvedOptions().timeZone)||'';m=/^America\\//.test(tz)?'US':'GB';}document.documentElement.dataset.market=m;}catch(e){document.documentElement.dataset.market='GB';}})();`;
 const themeScript = `(function(){try{var t=localStorage.getItem('bp_theme');var d=t==='dark'||((!t||t==='system')&&matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})();`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
@@ -26,6 +27,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
     <html lang="en-GB" suppressHydrationWarning className={`${display.variable} ${sans.variable}`}>
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script dangerouslySetInnerHTML={{ __html: marketScript }} />
       </head>
       <body className="flex min-h-dvh flex-col">
         <a

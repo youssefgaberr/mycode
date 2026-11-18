@@ -4,6 +4,7 @@ vi.mock("@/lib/db", () => ({ db: {} }));
 
 import { buildOffer, matchesContent, parseAging, pickFreight, variantLabel } from "@/lib/cj/catalog";
 import { contentByKey } from "@/content/products";
+import { keywordRelevance } from "@/lib/cj/discover";
 import type { CjProductDetail } from "@/lib/cj/types";
 
 const liners = contentByKey("air-fryer-liners")!;
@@ -34,9 +35,21 @@ describe("freight helpers", () => {
       { logisticName: "Slow", logisticPrice: 3, logisticAging: "10-20" },
       { logisticName: "Fast", logisticPrice: 3, logisticAging: "3-5" },
       { logisticName: "Pricey", logisticPrice: 9, logisticAging: "1-2" },
-      { logisticName: "Broken", logisticPrice: 0 },
+      { logisticName: "NoPrice" },
     ]);
     expect(best?.logisticName).toBe("Fast");
+  });
+
+  it("accepts free shipping (UK warehouses often quote 0)", () => {
+    const best = pickFreight([
+      { logisticName: "Paid", logisticPrice: 2.5, logisticAging: "2-4" },
+      { logisticName: "UK Free", logisticPrice: 0, logisticAging: "2-5" },
+    ]);
+    expect(best?.logisticName).toBe("UK Free");
+  });
+
+  it("rejects options without a stated price or name", () => {
+    expect(pickFreight([{ logisticName: "X" }, { logisticPrice: 1 }])).toBeNull();
   });
 });
 
@@ -89,5 +102,13 @@ describe("buildOffer", () => {
   it("returns null when nothing is in stock", async () => {
     const offer = await buildOffer(detail, { variantInventories: [] }, vi.fn(async () => []), 0.8);
     expect(offer).toBeNull();
+  });
+});
+
+describe("keywordRelevance", () => {
+  it("scores real matches high and loose CJ results low", () => {
+    expect(keywordRelevance("silicone air fryer liner", "Air Fryer Silicone Pot Liners Reusable")).toBe(1);
+    expect(keywordRelevance("silicone air fryer liner", "Adjustable Air Conditioning Cover Wind Deflector")).toBeLessThan(0.6);
+    expect(keywordRelevance("herb scissors", "5 Blade Herb Scissors Kitchen")).toBe(1);
   });
 });

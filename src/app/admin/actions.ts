@@ -8,8 +8,9 @@ import { db } from "@/lib/db";
 import { isLive } from "@/lib/env";
 import { checkPassword, endAdminSession, requireAdmin, startAdminSession } from "@/lib/admin-auth";
 import { fetchOffer, fetchVideos, saveProduct, syncCatalog } from "@/lib/cj/catalog";
-import { importProducts } from "@/lib/cj/import";
-import { discoverProducts } from "@/lib/cj/discover";
+import { importProducts, PIN_PREFIX } from "@/lib/cj/import";
+import { discoverProducts, searchToSourcing } from "@/lib/cj/discover";
+import { contentByKey } from "@/content/products";
 import { seedDemoProducts } from "@/lib/demo";
 import * as cj from "@/lib/cj/client";
 import { checkTracking, retryCjSubmission } from "@/lib/orders";
@@ -59,17 +60,35 @@ export async function resyncFromCj() {
 
 const cjConfigured = () => !!(process.env.CJ_API_KEY || process.env.CJ_ACCESS_TOKEN);
 
+/** Collects log lines from a CJ job and stores them so /admin can show "Last run log". */
+async function withRunLog<T>(kind: string, run: (log: (s: string) => void) => Promise<T>, summarise: (r: T) => string) {
+  const lines: string[] = [];
+  const log = (s: string) => {
+    lines.push(s);
+    console.log(`[${kind}] ${s}`);
+  };
+  const row = await db.syncLog.create({ data: { kind: `admin-${kind}` } });
+  try {
+    const result = await run(log);
+    const msg = summarise(result);
+    await db.syncLog.update({ where: { id: row.id }, data: { ok: true, summary: `${msg}\n${lines.join("\n")}`.slice(0, 60000), finishedAt: new Date() } });
+    return msg;
+  } catch (err) {
+    const msg = `Failed: ${(err as Error).message}`;
+    await db.syncLog.update({ where: { id: row.id }, data: { ok: false, summary: `${msg}\n${lines.join("\n")}`.slice(0, 60000), finishedAt: new Date() } });
+    return msg;
+  }
+}
+
 /** Same as `npm run import`, run on the server with the CJ key saved in Vercel. */
 export async function importFromCj() {
   await requireAdmin();
   if (!cjConfigured()) back("/admin/products", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
-  let msg: string;
-  try {
-    const r = await importProducts({ log: () => {} });
-    msg = `Imported ${r.imported} of ${r.total} products from CJ.${r.removedDemo ? ` Removed ${r.removedDemo} demo products.` : ""} Check each one below.`;
-  } catch (err) {
-    msg = `Import failed: ${(err as Error).message}`;
-  }
+  const msg = await withRunLog(
+    "import",
+    (log) => importProducts({ log }),
+    (r) => `Imported ${r.imported} of ${r.total} products from CJ.${r.removedDemo ? ` Removed ${r.removedDemo} demo products.` : ""} Check each one below.`,
+  );
   updateTag("products");
   back("/admin/products", msg);
 }
@@ -87,13 +106,57 @@ export async function loadDemoProducts() {
 export async function discoverTrending() {
   await requireAdmin();
   if (!cjConfigured()) back("/admin/sourcing", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
+  const msg = await withRunLog(
+    "discover",
+    (log) => discoverProducts({ limit: 12, log }),
+    (r) => `Searched CJ: ${r.eligible} eligible products found, ${r.saved} added to the sourcing database with photos, videos and costs.`,
+  );
+  back("/admin/sourcing", msg);
+}
+
+/** Search CJ for a keyword and add the best listings to the sourcing database. */
+export async function searchCj(formData: FormData) {
+  await requireAdmin();
+  const keyword = String(formData.get("keyword") ?? "").trim().slice(0, 80);
+  if (keyword.length < 2) back("/admin/sourcing", "Type what you're looking for, e.g. “silicone air fryer liner”.");
+  if (!cjConfigured()) back("/admin/sourcing", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
+  const msg = await withRunLog(
+    "search",
+    (log) => searchToSourcing(keyword, { limit: 8, log }),
+    (r) => `“${keyword}”: ${r.found} listings found on CJ, ${r.saved} added below (UK/EU stock first).`,
+  );
+  back(`/admin/sourcing`, msg);
+}
+
+/**
+ * Use a sourcing candidate as one of the core products (keeps our own copy for
+ * that product) and pin it, so future imports keep this exact CJ listing.
+ */
+export async function useForCoreProduct(formData: FormData) {
+  await requireAdmin();
+  const id = String(formData.get("id"));
+  const key = String(formData.get("contentKey"));
+  const content = contentByKey(key);
+  if (!content) back("/admin/sourcing", "Choose which product this listing should be.");
+  const candidate = await db.sourcingCandidate.findUniqueOrThrow({ where: { id } });
   let msg: string;
   try {
-    const r = await discoverProducts({ limit: 12, log: () => {} });
-    msg = `Searched CJ: ${r.eligible} eligible products found, ${r.saved} added to the sourcing database with photos, videos and costs.`;
+    const { detail, offer } = await fetchOffer(candidate.cjProductId);
+    if (!offer) throw new Error("No in-stock variant ships to the UK any more.");
+    const videos = await fetchVideos(candidate.cjProductId);
+    const product = await saveProduct({ content: content!, detail, offer, videos });
+    const pinKey = `${PIN_PREFIX}${key}`;
+    await db.setting.upsert({
+      where: { key: pinKey },
+      create: { key: pinKey, value: candidate.cjProductId },
+      update: { value: candidate.cjProductId },
+    });
+    await db.sourcingCandidate.update({ where: { id }, data: { status: "PUBLISHED", productId: product.id } });
+    msg = `“${product.title}” now uses this CJ listing (${product.isAddOn ? "add-on" : "main product"}, ${formatGBP(product.pricePence)}).`;
   } catch (err) {
-    msg = `Discovery failed: ${(err as Error).message}`;
+    msg = `Couldn't use this listing: ${(err as Error).message}`;
   }
+  updateTag("products");
   back("/admin/sourcing", msg);
 }
 

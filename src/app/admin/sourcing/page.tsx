@@ -58,7 +58,7 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
         </form>
       </div>
       <p className="text-xs text-muted">
-        Discovery searches CJ and saves up to 12 new products per run (takes 2–4 minutes; keep this page open). Run it
+        Discovery searches CJ and saves up to 10 new products per run (takes 2–4 minutes; keep this page open). Run it
         again for more.
       </p>
 

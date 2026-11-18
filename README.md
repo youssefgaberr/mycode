@@ -333,6 +333,28 @@ and a unit test fails if the Postgres schema is out of date.
 
 ---
 
+## CJ API points (daily allowance)
+
+CJ gives each account a daily allowance of **API points**: 50,000, plus extra once you
+have orders, at 100 points per $1 of your last three months' CJ spend. The allowance
+resets at **00:00 UTC** and also refills gradually through the day, at about 1/1440 of it
+per minute. Rough costs:
+
+- each catalogue search (`listV2`) is **50 points**, and one "Collect trending" run does dozens of them;
+- each product detail lookup is **10 points**, plus small amounts for stock, shipping quotes and videos.
+
+What the store does when points run out:
+
+- **The daily sync** stops and hides nothing. Products keep their last known price and stock until the next sync.
+- **Bulk publish** stops and lists the products it didn't reach, so you can submit them again later.
+- **Checkout** skips the live stock check and still takes the order.
+- **New CJ orders** fail and are marked NEEDS_ATTENTION, so press Retry once points are back.
+
+So keep "Collect trending" runs for quiet times, and don't run more than a few a day once
+you're taking real orders.
+
+---
+
 ## What you must do manually each day
 
 1. **Open `/admin` and deal with NEEDS_ATTENTION orders.** The reason is shown on each

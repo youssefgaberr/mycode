@@ -32,6 +32,20 @@ export const TRENDING_SEARCHES: { keyword: string; category: CategorySlug }[] = 
   { keyword: "car accessories", category: "car" },
   { keyword: "car organizer", category: "car" },
   { keyword: "car cleaning", category: "car" },
+  { keyword: "lunch box", category: "kitchen" },
+  { keyword: "spice rack", category: "kitchen" },
+  { keyword: "silicone kitchen", category: "kitchen" },
+  { keyword: "storage box", category: "home" },
+  { keyword: "led night light", category: "home" },
+  { keyword: "phone stand", category: "home" },
+  { keyword: "resistance band", category: "fitness" },
+  { keyword: "yoga", category: "fitness" },
+  { keyword: "travel organizer", category: "fitness" },
+  { keyword: "pet feeder", category: "pets" },
+  { keyword: "cat litter", category: "pets" },
+  { keyword: "dog leash", category: "pets" },
+  { keyword: "car phone holder", category: "car" },
+  { keyword: "car seat organizer", category: "car" },
 ];
 
 /**
@@ -192,7 +206,9 @@ export async function collectTrendingCandidates(opts: { limit?: number; timeBudg
     ...(await db.sourcingCandidate.findMany({ select: { cjProductId: true } })).map((r) => r.cjProductId),
   ]);
   const runNo = await db.syncLog.count({ where: { kind: "admin-collect" } });
-  const offset = (runNo * 4) % TRENDING_SEARCHES.length;
+  const offset = (runNo * 7) % TRENDING_SEARCHES.length;
+  // Later runs look further down CJ's lists.
+  const page = 1 + (runNo % 4);
   const searches = [...TRENDING_SEARCHES.slice(offset), ...TRENDING_SEARCHES.slice(0, offset)];
   const found: { p: CjListProduct; category: CategorySlug; score: number }[] = [];
   const seen = new Set<string>();
@@ -200,7 +216,7 @@ export async function collectTrendingCandidates(opts: { limit?: number; timeBudg
     if (Date.now() - started > budget * 0.25) break;
     for (const country of ["GB", undefined] as const) {
       try {
-        const results = await cj.searchProducts({ keyWord: keyword, countryCode: country, productFlag: 0, size: 20 });
+        const results = await cj.searchProducts({ keyWord: keyword, countryCode: country, productFlag: 0, size: 20, page });
         for (const p of results) {
           if (!p.id || known.has(p.id) || seen.has(p.id) || !trendingAllowed(p.nameEn ?? "") || num(p.sellPrice) > MAX_COST_USD) continue;
           seen.add(p.id);

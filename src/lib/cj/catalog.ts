@@ -151,6 +151,7 @@ export async function buildOffer(
           best = pickFreight(options);
           if (!best) diag?.(`    no usable UK shipping from ${country} (${options.length} option(s) returned)`);
         } catch (err) {
+          if (cj.isQuotaError(err)) throw err;
           console.warn(`  freight quote failed for ${v.vid} from ${country}: ${(err as Error).message}`);
           diag?.(`    shipping quote from ${country} failed: ${(err as Error).message}`);
         }
@@ -379,6 +380,7 @@ export async function fetchVideos(pid: string) {
       .map((v) => ({ cjVideoId: v.videoId ?? v.id, url: v.videoUrl! }))
       .slice(0, 3);
   } catch (err) {
+    if (cj.isQuotaError(err)) throw err;
     console.warn(`  could not fetch videos for ${pid}: ${(err as Error).message}`);
     return [];
   }
@@ -390,6 +392,7 @@ export async function fetchOffer(pid: string, diag?: (s: string) => void) {
   try {
     inventory = await cj.getInventoryByPid(pid);
   } catch (err) {
+    if (cj.isQuotaError(err)) throw err;
     console.warn(`  inventory lookup failed for ${pid}: ${(err as Error).message}`);
     diag?.(`    inventory lookup failed: ${(err as Error).message}`);
   }
@@ -504,6 +507,11 @@ export async function syncCatalog(log: (s: string) => void = console.log) {
     } catch (err) {
       result.failed++;
       log(`  ${product.title}: sync failed — ${(err as Error).message}`);
+      if (cj.isQuotaError(err)) {
+        // Out of CJ API points: stop here rather than hide products for lack of data.
+        log("CJ API points are used up for now — sync stopped. No products were hidden; the next sync carries on.");
+        break;
+      }
     }
   }
   return result;

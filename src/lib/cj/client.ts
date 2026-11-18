@@ -38,6 +38,17 @@ export class CjError extends Error {
   }
 }
 
+/**
+ * True when CJ refused a request because the account's daily API points (or
+ * request rate) are used up. Callers must not treat this as "no stock" or
+ * "no shipping": the data is simply unavailable until points refill.
+ */
+export function isQuotaError(err: unknown) {
+  if (!(err instanceof Error)) return false;
+  if (err instanceof CjError && err.httpStatus === 429) return true;
+  return /API points|too many requests|rate limit|QPS/i.test(err.message);
+}
+
 interface CjEnvelope<T> {
   code?: number;
   result?: boolean;

@@ -99,6 +99,20 @@ describe("buildOffer", () => {
     expect(quote.mock.calls.filter(([c]) => c === "CN")).toHaveLength(1);
   });
 
+  it("throws (instead of reporting no shipping) when CJ API points run out", async () => {
+    const { CjError, isQuotaError } = await import("@/lib/cj/client");
+    const quote = vi.fn(async () => {
+      throw new CjError("CJ /logistic/freightCalculate failed: Insufficient API points. Used today: 57410, Remaining: 0");
+    });
+    const err = await buildOffer(detail, inventory, quote, 0.8).catch((e) => e);
+    expect(isQuotaError(err)).toBe(true);
+    // an ordinary shipping failure still just skips that warehouse
+    const other = vi.fn(async () => {
+      throw new CjError("CJ /logistic/freightCalculate failed: no route");
+    });
+    await expect(buildOffer(detail, inventory, other, 0.8)).resolves.toBeNull();
+  });
+
   it("returns null when nothing is in stock", async () => {
     const offer = await buildOffer(detail, { variantInventories: [] }, vi.fn(async () => []), 0.8);
     expect(offer).toBeNull();

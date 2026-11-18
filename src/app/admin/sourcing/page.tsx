@@ -36,7 +36,7 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
   ]);
   const count = (s: string) => counts.find((c) => c.status === s)?._count ?? 0;
   const lastRun = await db.syncLog.findFirst({
-    where: { kind: { in: ["admin-discover", "admin-search", "discover"] } },
+    where: { kind: { in: ["admin-discover", "admin-search", "discover", "admin-collect", "admin-bulk", "admin-trending"] } },
     orderBy: { startedAt: "desc" },
   });
 

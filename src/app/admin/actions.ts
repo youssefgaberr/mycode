@@ -183,9 +183,10 @@ export async function bulkPublish(formData: FormData) {
   const msg = await withRunLog(
     "bulk",
     async (log) => {
-      const r = { published: 0, rejected: 0, failed: 0, notProcessed: [] as string[] };
+      const r = { published: 0, rejected: 0, failed: 0, notProcessed: [] as string[], errors: [] as string[] };
+      let quotaHit = false;
       for (const item of items) {
-        if (Date.now() - started > 235_000) {
+        if (quotaHit || Date.now() - started > 235_000) {
           r.notProcessed.push(item.cjProductId);
           continue;
         }
@@ -222,15 +223,26 @@ export async function bulkPublish(formData: FormData) {
           r.published++;
           log(`  ✓ ${product.title}`);
         } catch (err) {
+          if (cj.isQuotaError(err)) {
+            // CJ API points used up: keep this and the rest for a later run.
+            quotaHit = true;
+            r.notProcessed.push(item.cjProductId);
+            r.errors.push((err as Error).message);
+            continue;
+          }
           r.failed++;
+          r.errors.push((err as Error).message);
           log(`  ✗ ${item.cjProductId}: ${(err as Error).message}`);
         }
       }
-      return r;
+      return { ...r, quotaHit };
     },
     (r) =>
       `Bulk publish: ${r.published} published, ${r.rejected} rejected, ${r.failed} failed` +
-      (r.notProcessed.length ? `, ${r.notProcessed.length} not processed (time limit) — submit them again.` : "."),
+      (r.notProcessed.length
+        ? `, ${r.notProcessed.length} not processed (${r.quotaHit ? "CJ API points used up — try again later" : "time limit"}) — submit them again.`
+        : ".") +
+      (r.errors.length ? ` First error: ${r.errors[0]}` : ""),
   );
   updateTag("products");
   back("/admin/sourcing", msg);

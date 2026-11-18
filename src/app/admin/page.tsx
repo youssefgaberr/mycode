@@ -5,6 +5,7 @@ import { getAdminCounts, getAdminOrders, getDailySummary } from "@/lib/admin-dat
 import { formatGBP } from "@/lib/pricing";
 import { isLive } from "@/lib/env";
 import { store } from "@/config/store";
+import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, Stat, StatusBadge, btn, btnPrimary } from "@/components/admin/ui";
 import { refundOrder, retryOrder, runTrackingNow, setOrderStatus, simulateSandboxShipment } from "./actions";
 
@@ -103,11 +104,11 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/admin">, "searchPara
             All incl. abandoned
           </Link>
           <form action={runTrackingNow}>
-            <button className={btnPrimary}>Check tracking now</button>
+            <SubmitButton className={btnPrimary} pendingText="Checking…">Check tracking now</SubmitButton>
           </form>
         </div>
         <p className="text-xs text-muted">
-          Tracking is also checked automatically every 6 hours
+          Tracking is also checked automatically once a day
           {counts.lastTracking ? ` (last: ${dt.format(counts.lastTracking.startedAt)})` : ""}.
         </p>
 
@@ -197,7 +198,7 @@ async function Dashboard({ searchParams }: Pick<PageProps<"/admin">, "searchPara
                     {o.status === "NEEDS_ATTENTION" && (
                       <form action={retryOrder}>
                         <input type="hidden" name="id" value={o.id} />
-                        <button className={btnPrimary}>Retry CJ order</button>
+                        <SubmitButton className={btnPrimary} pendingText="Retrying…">Retry CJ order</SubmitButton>
                       </form>
                     )}
                     {!isLive() && o.status === "SENT_TO_CJ" && o.shipments.some((s) => s.isSandbox && s.cjOrderId) && (

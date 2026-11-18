@@ -46,7 +46,7 @@ orders and tracking. No scraping anywhere.
 
 - The Stripe webhook saves the order, emails the customer a confirmation, and creates the order on CJ: one CJ order per source warehouse, with the customer's address.
 - If anything fails, the order is marked **NEEDS_ATTENTION** with the reason. It is never retried silently.
-- A cron job checks tracking every 6 hours, saves the tracking number and emails the customer when the parcel ships.
+- A cron job checks tracking (daily on Vercel's free plan; every 6 hours on Pro, or on demand with **Check tracking now** in `/admin`), saves the tracking number and emails the customer when the parcel ships.
 - A daily cron re-syncs prices and stock from CJ. Out-of-stock products are hidden automatically and return when stock does.
 - Refunds and card disputes reported by Stripe update the order automatically.
 
@@ -228,7 +228,7 @@ Customer pays (Stripe)
   → actual Stripe fee recorded
   → CJ order(s) created, one per warehouse (create-only: payType=3, no automatic charge)
       ✓ SENT_TO_CJ          ✗ NEEDS_ATTENTION (reason saved, no automatic retry)
-Every 6 h (cron): CJ status + tracking → SHIPPED → "your order has shipped" email
+Daily cron (or "Check tracking now"): CJ status + tracking → SHIPPED → "your order has shipped" email
                   → DELIVERED
 ```
 
@@ -291,15 +291,18 @@ migrations before building.
    `https://YOUR-DOMAIN/api/stripe/webhook` with the events listed under
    [Payments](#payments-stripe). Copy its signing secret into
    `STRIPE_WEBHOOK_SECRET` and redeploy.
-6. **Load products into the production database.** On your computer, temporarily
+6. **Load products into the production database.** Easiest: in `/admin/products` press
+   **Import products from CJ** (needs `CJ_API_KEY` set in Vercel), or **Load demo products**
+   while in test mode. In `/admin/sourcing`, **Discover trending products** fills the sourcing
+   database. Alternatively, from your computer: temporarily
    point `DATABASE_URL` in `.env.local` at the Neon URL (copy it from Vercel →
    Storage). Then run `npm run import` and/or `npm run discover`, and switch
    `DATABASE_URL` back. On the live site, press **Re-sync** in `/admin/products`
    to refresh the cache. In test mode, `npm run seed:demo` against the same URL
    gives the live site demo products.
-7. **Cron jobs** are defined in `vercel.json`: tracking every 6 hours and a daily
+7. **Cron jobs** are defined in `vercel.json`: tracking daily at 16:15 UTC and a daily
    sync at 04:30 UTC. Vercel signs them with `CRON_SECRET` automatically.
-   - Vercel's Hobby (free) plan restricts how often crons may run. If the deploy is rejected because of the 6-hourly schedule, either upgrade to Pro (paid) or change it to daily in `vercel.json` and call `/api/cron/tracking` from a free external scheduler with the header `Authorization: Bearer YOUR_CRON_SECRET`.
+   - Vercel's Hobby (free) plan only allows daily crons, so tracking runs once a day. For every 6 hours, either upgrade to Pro (paid) and set the tracking schedule to `0 */6 * * *`, or call `/api/cron/tracking` from a free external scheduler (e.g. cron-job.org) with the header `Authorization: Bearer YOUR_CRON_SECRET`.
 8. **Your own domain:** Project → Settings → Domains. Then update
    `NEXT_PUBLIC_SITE_URL` and the Stripe webhook URL.
 

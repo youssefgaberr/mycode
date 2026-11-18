@@ -4,10 +4,11 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { formatGBP } from "@/lib/pricing";
 import { store, warehouseLabels } from "@/config/store";
+import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, StatusBadge, btn, btnPrimary } from "@/components/admin/ui";
-import { publishCandidate, setCandidateStatus } from "../actions";
+import { discoverTrending, publishCandidate, setCandidateStatus } from "../actions";
 
-export const maxDuration = 120;
+export const maxDuration = 300;
 
 const parse = (s: string): string[] => {
   try {
@@ -37,7 +38,8 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
   return (
     <div className="space-y-6">
       <Flash msg={msg} />
-      <div>
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
         <h1 className="text-2xl font-extrabold">Sourcing database</h1>
         <p className="mt-1 max-w-3xl text-sm text-muted">
           Real supplier products found on CJdropshipping by <code>npm run discover</code> (trending and best-selling home
@@ -45,7 +47,15 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
           Approve the ones you like, then publish each with <strong>your own</strong> title and description — supplier
           text is never shown to customers.
         </p>
+        </div>
+        <form action={discoverTrending}>
+          <SubmitButton className={btnPrimary} pendingText="Searching CJ… (2–4 min)">Discover trending products</SubmitButton>
+        </form>
       </div>
+      <p className="text-xs text-muted">
+        Discovery searches CJ and saves up to 12 new products per run (takes 2–4 minutes; keep this page open). Run it
+        again for more.
+      </p>
 
       <nav aria-label="Filter" className="flex flex-wrap gap-2">
         {FILTERS.map((s) => (
@@ -62,7 +72,7 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
 
       {candidates.length === 0 && (
         <p className="rounded-xl border border-dashed border-border p-8 text-center text-muted">
-          Nothing here. Run <code>npm run discover</code> to search CJ for trending products.
+          Nothing here yet. Press “Discover trending products” above (or run <code>npm run discover</code>).
         </p>
       )}
 
@@ -186,7 +196,7 @@ async function Sourcing({ searchParams }: Pick<PageProps<"/admin/sourcing">, "se
                       <textarea name="bullets" required rows={4} className="mt-1 w-full rounded-lg border border-border bg-bg p-2" />
                     </label>
                     <div className="sm:col-span-2">
-                      <button className={btnPrimary}>Fetch latest CJ data &amp; publish</button>
+                      <SubmitButton className={btnPrimary} pendingText="Publishing…">Fetch latest CJ data &amp; publish</SubmitButton>
                     </div>
                   </form>
                 </details>

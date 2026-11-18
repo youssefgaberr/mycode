@@ -4,7 +4,7 @@ import { checkTracking } from "@/lib/orders";
 
 export const maxDuration = 300;
 
-/** Runs every 6 hours (see vercel.json): CJ status + tracking, shipped emails. */
+/** Runs on the schedule in vercel.json (daily on Vercel Hobby): CJ status + tracking, shipped emails. */
 export async function GET(request: Request) {
   if (!isAuthorisedCron(request)) return new Response("Unauthorised", { status: 401 });
   const log = await db.syncLog.create({ data: { kind: "tracking" } });

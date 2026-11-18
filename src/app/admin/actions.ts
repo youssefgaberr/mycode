@@ -8,6 +8,9 @@ import { db } from "@/lib/db";
 import { isLive } from "@/lib/env";
 import { checkPassword, endAdminSession, requireAdmin, startAdminSession } from "@/lib/admin-auth";
 import { fetchOffer, fetchVideos, saveProduct, syncCatalog } from "@/lib/cj/catalog";
+import { importProducts } from "@/lib/cj/import";
+import { discoverProducts } from "@/lib/cj/discover";
+import { seedDemoProducts } from "@/lib/demo";
 import * as cj from "@/lib/cj/client";
 import { checkTracking, retryCjSubmission } from "@/lib/orders";
 import { getStripe } from "@/lib/stripe";
@@ -52,6 +55,46 @@ export async function resyncFromCj() {
   }
   updateTag("products");
   back("/admin/products", msg);
+}
+
+const cjConfigured = () => !!(process.env.CJ_API_KEY || process.env.CJ_ACCESS_TOKEN);
+
+/** Same as `npm run import`, run on the server with the CJ key saved in Vercel. */
+export async function importFromCj() {
+  await requireAdmin();
+  if (!cjConfigured()) back("/admin/products", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
+  let msg: string;
+  try {
+    const r = await importProducts({ log: () => {} });
+    msg = `Imported ${r.imported} of ${r.total} products from CJ.${r.removedDemo ? ` Removed ${r.removedDemo} demo products.` : ""} Check each one below.`;
+  } catch (err) {
+    msg = `Import failed: ${(err as Error).message}`;
+  }
+  updateTag("products");
+  back("/admin/products", msg);
+}
+
+/** Test mode only: fill an empty shop with clearly-labelled demo products. */
+export async function loadDemoProducts() {
+  await requireAdmin();
+  if (isLive()) back("/admin/products", "Demo products are disabled in live mode.");
+  const n = await seedDemoProducts({ log: () => {} });
+  updateTag("products");
+  back("/admin/products", n ? `Loaded ${n} demo products.` : "Real products exist, so demo products were not added.");
+}
+
+/** Same as `npm run discover` (smaller batch, to fit in one request). */
+export async function discoverTrending() {
+  await requireAdmin();
+  if (!cjConfigured()) back("/admin/sourcing", "Add CJ_API_KEY in Vercel → Settings → Environment Variables, redeploy, then try again.");
+  let msg: string;
+  try {
+    const r = await discoverProducts({ limit: 12, log: () => {} });
+    msg = `Searched CJ: ${r.eligible} eligible products found, ${r.saved} added to the sourcing database with photos, videos and costs.`;
+  } catch (err) {
+    msg = `Discovery failed: ${(err as Error).message}`;
+  }
+  back("/admin/sourcing", msg);
 }
 
 export async function setPublished(formData: FormData) {

@@ -69,6 +69,27 @@ products get clicks. Those are the ones to run small paid tests on.
 - No fake reviews, testimonials or invented sales numbers. These are illegal under the UK DMCC Act 2024 and the US FTC rules.
 - Paid or gifted creators must label posts as ads (#ad, or the platform's paid-partnership tag).
 
+## Planned: a weekly automatic TikTok pipeline (not built yet)
+
+The idea the owner asked about, written down so it can be built in a later session:
+
+1. **Pick:** each week, take the newest HOT products (and last week's best sellers).
+2. **Make:** build a 7–15 second vertical video per product with `ffmpeg`.
+   - Clips: the product's CJ supplier clips and photos.
+   - Overlays: a text hook, 3 benefit captions, the price (£ for UK, $ for US) and an end card ("Brightpan: link in bio").
+   - Watermarks from other shops cropped or blurred.
+   - No music baked in: trending sounds are added in the TikTok app from the commercial library, which keeps the rights clean.
+3. **Write:** a caption plus 3–5 hashtags, following the same rules as product copy (no health or safety claims).
+4. **Publish:** two options.
+   - **TikTok Content Posting API, "upload as draft".** The video lands in the owner's TikTok inbox; the owner adds a sound and taps Post (about 1 minute per video). Needs a free TikTok developer app linked to the shop's TikTok account. Posting fully automatically ("direct post") needs TikTok to audit and approve the app first; until then, API posts can only be private.
+   - **A scheduler** (Buffer, Later, Metricool) that posts to TikTok, Instagram Reels and YouTube Shorts at once. It's simpler but has a monthly fee (owner's decision).
+5. **Report:** list what was posted, and later which videos drove clicks and orders.
+
+Needed from the owner first:
+- a TikTok business account for the shop;
+- a TikTok developer app, or a scheduler account;
+- a decision on drafts versus automatic posting.
+
 ## Ads, when you're ready (spending money: owner's decision)
 
 - Start with the products that got the best organic engagement.

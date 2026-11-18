@@ -4,8 +4,10 @@ import { requireAdmin } from "@/lib/admin-auth";
 import { db } from "@/lib/db";
 import { formatGBP } from "@/lib/pricing";
 import { categoryName, store, warehouseLabels } from "@/config/store";
+import { SubmitButton } from "@/components/admin/SubmitButton";
 import { Flash, btn, btnPrimary } from "@/components/admin/ui";
-import { resyncFromCj, setPublished } from "../actions";
+import { importFromCj, loadDemoProducts, resyncFromCj, setPublished } from "../actions";
+import { isLive } from "@/lib/env";
 
 export const maxDuration = 300;
 
@@ -27,10 +29,28 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
       <Flash msg={msg} />
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="mr-auto text-2xl font-extrabold">Products</h1>
+        {!isLive() && (
+          <form action={loadDemoProducts}>
+            <SubmitButton className={btn} pendingText="Loading…">Load demo products</SubmitButton>
+          </form>
+        )}
+        <form action={importFromCj}>
+          <SubmitButton className={btn} pendingText="Importing from CJ… (1–3 min)">Import products from CJ</SubmitButton>
+        </form>
         <form action={resyncFromCj}>
-          <button className={btnPrimary}>Re-sync prices &amp; stock from CJ</button>
+          <SubmitButton className={btnPrimary} pendingText="Re-syncing… (1–2 min)">Re-sync prices &amp; stock from CJ</SubmitButton>
         </form>
       </div>
+      {!(process.env.CJ_API_KEY || process.env.CJ_ACCESS_TOKEN) && (
+        <p className="rounded-lg border border-danger p-3 text-sm">
+          <strong>CJ isn&apos;t connected.</strong> Add <code>CJ_API_KEY</code> in Vercel → your project → Settings →
+          Environment Variables, then redeploy. Import, re-sync and order automation need it.
+        </p>
+      )}
+      <p className="text-sm text-muted">
+        <strong>Import products from CJ</strong> finds the best CJ match for each product in your content file (takes 1–3
+        minutes; keep this page open). It replaces any demo products.
+      </p>
       <p className="text-sm text-muted">
         Re-sync fetches current supplier prices, stock and UK shipping from CJ, recalculates shop prices
         (×{store.pricing.markup}, .99, min £{store.pricing.minimumPrice}), and hides products that are out of stock (they
@@ -56,6 +76,13 @@ async function Products({ searchParams }: Pick<PageProps<"/admin/products">, "se
             </tr>
           </thead>
           <tbody>
+            {products.length === 0 && (
+              <tr>
+                <td colSpan={9} className="p-6 text-center text-muted">
+                  No products yet. Use “Import products from CJ”{!isLive() && " or “Load demo products”"} above.
+                </td>
+              </tr>
+            )}
             {products.map((p) => {
               const stock = p.variants.reduce((s, v) => s + v.stock, 0);
               const visible = p.published && p.inStock && p.variants.length > 0;

@@ -1,7 +1,7 @@
 /**
  * Order automation:
  *   Stripe payment → markOrderPaid → submitOrderToCj (one CJ order per warehouse)
- *   Every 6 h      → checkTracking → "your order has shipped" emails
+ *   Cron (daily)   → checkTracking → "your order has shipped" emails
  *
  * Failures never retry silently: the order is marked NEEDS_ATTENTION with the
  * reason, and you retry from /admin when you've looked at it.
